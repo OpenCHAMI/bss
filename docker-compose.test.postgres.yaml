@@ -1,0 +1,49 @@
+version: '3.7'
+
+networks:
+  bss:
+
+services:
+  postgres:
+    hostname: postgres
+    image: postgres:11-alpine
+    environment:
+      - POSTGRES_PASSWORD=bssuser
+      - POSTGRES_USER=bssuser
+      - POSTGRES_DB=bssdb
+    ports:
+      - '5432:5432'
+    networks:
+      - bss
+  hms-bss:
+    hostname: hms-bss
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - SQL_USER=bssuser
+      - SQL_PASSWORD=bssuser
+    ports:
+      - '27778:27778'
+    build:
+      context: .
+      dockerfile: Dockerfile.bss-postgres.Dockerfile
+    depends_on:
+      - postgres
+    networks:
+      - bss
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:27778/boot/v1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  hms-bss-test:
+    hostname: hms-bss-test
+    build:
+      context: .
+      dockerfile: Dockerfile.bss-postgres-test.Dockerfile
+    depends_on:
+      hms-bss:
+        condition: service_healthy
+        restart: true
+    networks:
+      - bss

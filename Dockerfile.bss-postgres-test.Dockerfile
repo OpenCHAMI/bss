@@ -1,6 +1,6 @@
 # MIT License
 #
-# (C) Copyright [2020-2022] Hewlett Packard Enterprise Development LP
+# (C) Copyright [2021] Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -20,20 +20,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-FROM artifactory.algol60.net/csm-docker/stable/hms-test:5.0.0
+# Dockerfile for running postgres integration tests.
 
-COPY smoke/ /src/app
-COPY api/ /src/app/api
-COPY tavern_global_config_ct_test.yaml /src/app/tavern_global_config_ct_test.yaml
-COPY bss_test_utils.py /src/libs/bss_test_utils.py
+### build-base stage ###
+# Build base just has the packages installed we need.
+FROM ghcr.io/orange-opensource/hurl:latest
 
-ENV PATH="/src/libs:${PATH}"
-ENV PATH="/src/app:${PATH}"
-ENV PYTHONPATH=$PYTHONPATH:/src/libs 
+# Copy all the necessary files to the image.
+COPY test/ct/postgres /postgres
 
-USER root
-RUN chown -R 65534:65534 /src
-USER 65534:65534
+WORKDIR /postgres
 
-# this is inherited from the hms-test container
-ENTRYPOINT [ "entrypoint.sh" ]
+# Run unit tests.
+CMD ["--test", "/postgres/test.hurl"]

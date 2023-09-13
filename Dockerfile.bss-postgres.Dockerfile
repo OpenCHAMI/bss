@@ -34,17 +34,20 @@ RUN set -ex \
 # Base copies in the files we need to test/build.
 FROM build-base AS base
 
-RUN go env -w GO111MODULE=auto
-
 # Copy all the necessary files to the image.
-COPY cmd $GOPATH/src/github.com/Cray-HPE/hms-bss/cmd
-COPY pkg $GOPATH/src/github.com/Cray-HPE/hms-bss/pkg
-COPY .version $GOPATH/src/github.com/Cray-HPE/hms-bss/.version
+COPY go.mod /hms-bss/go.mod
+COPY go.sum /hms-bss/go.sum
+COPY cmd /hms-bss/cmd
+COPY pkg /hms-bss/pkg
+COPY internal /hms-bss/internal
+COPY .version /hms-bss/.version
 
 ### Build Stage ###
 FROM base AS builder
 
-RUN set -ex && go build -v -i -o /usr/local/bin/boot-script-service github.com/Cray-HPE/hms-bss/cmd/boot-script-service
+RUN set -ex \
+    && cd /hms-bss/cmd/boot-script-service \
+    && go build -v -o /usr/local/bin/boot-script-service
 
 ### Final Stage ###
 FROM alpine:3.15
@@ -56,27 +59,15 @@ STOPSIGNAL SIGTERM
 ENV HSM_URL=http://cray-smd
 ENV NFD_URL=http://cray-hmnfd
 
-# Set up default path to the Datastore service.
-#ENV DATASTORE_URL=https://$ETCD_HOST:$ETCD_PORT
-# The datastore is now etcd.  We would like to set the URL to the above, as
-# the etcd operator sets up those two env variables.  Unfortunately, env
-# vars do not get interpretted in a Dockerfile.  Therefore, bss is set up to
-# look for those environment variables.  So we no longer set the DATASTORE_URL
-# environment variable.  We still allow it, however, so this setting can be
-# controlled from the outside more easily.  Note the special handling below.
-
 # WARNING: Our containers currently do not have certificates set up correctly
 #          to allow for https connections to other containers.  Therefore, we
 #          will use an insecure connection.  This needs to be corrected before
 #          release.  Once the certificates are properly set up, the --insecure
 #          option needs to be removed.
-ENV BSS_OPTS="--insecure"
+ENV BSS_OPTS="--insecure --postgres-insecure"
 
 ENV BSS_RETRY_DELAY=30
 ENV BSS_HSM_RETRIEVAL_DELAY=10
-
-ENV ETCD_HOST "etcd"
-ENV ETCD_PORT "2379"
 
 # Other potentially useful env variables:
 # BSS_IPXE_SERVER defaults to "api-gw-service-nmn.local"
@@ -97,4 +88,4 @@ COPY .version /
 USER 65534:65534
 
 # Set up the command to start the service, the run the init script.
-CMD boot-script-service $BSS_OPTS --hsm=$HSM_URL ${DATASTORE_URL:+--datastore=}$DATASTORE_URL --retry-delay=$BSS_RETRY_DELAY --hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
+CMD boot-script-service $BSS_OPTS --cloud-init-address localhost --hsm=$HSM_URL --postgres --postgres-host $POSTGRES_HOST --postgres-port $POSTGRES_PORT --retry-delay=$BSS_RETRY_DELAY --hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
