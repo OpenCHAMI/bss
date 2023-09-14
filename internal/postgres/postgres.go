@@ -9,6 +9,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const dbName = "bssdb"
+
 type Image struct {
 	ImageId string `json:"image_id"`         // fnv hash of the path to the image
 	Path    string `json:"path"`             // URL or path to the image
@@ -62,21 +64,32 @@ func makeImageKey(imtype, path string) string {
 	return makeKey(imtype, fmt.Sprintf("%x", h.Sum(nil)))
 }
 
-func AddImage(db *sqlx.DB, image Image) error {
-	db.ImageCache[makeImageKey(image.Type, image.Path)] = image
-	_, err := db.Exec(`INSERT INTO images (image_id, path, params, type, format) VALUES ($1, $2, $3, $4, $5)`,
+func Connect(host string, port uint, user, password string, ssl bool) (*sqlx.DB, error) {
+	var sslmode string
+	if ssl {
+		sslmode = "verify-full"
+	} else {
+		sslmode = "disable"
+	}
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", user, password, host, port, dbName, sslmode)
+	return sqlx.Connect("postgres", connStr)
+}
+
+func AddImage(bddb BootDataDatabase, image Image) error {
+	bddb.ImageCache[makeImageKey(image.Type, image.Path)] = image
+	_, err := bddb.DB.Exec(`INSERT INTO images (image_id, path, params, type, format) VALUES ($1, $2, $3, $4, $5)`,
 		image.ImageId, image.Path, image.Params, image.Type, image.Format)
 	return err
 }
 
-func AddBootConfig(db *sqlx.DB, bootConfig BootConfig) error {
-	_, err := db.Exec(`INSERT INTO boot_configs (boot_config_id, kernel_id, initrd_id, params) VALUES ($1, $2, $3, $4)`,
+func AddBootConfig(bddb BootDataDatabase, bootConfig BootConfig) error {
+	_, err := bddb.DB.Exec(`INSERT INTO boot_configs (boot_config_id, kernel_id, initrd_id, params) VALUES ($1, $2, $3, $4)`,
 		bootConfig.BootConfigId, bootConfig.Kernel, bootConfig.Initrd, bootConfig.Params)
 	return err
 }
 
-func AddBootGroup(db *sqlx.DB, bootGroup BootGroup) error {
-	_, err := db.Exec(`INSERT INTO boot_groups (boot_group_id, boot_config_id, macs) VALUES ($1, $2, $3)`,
+func AddBootGroup(bddb BootDataDatabase, bootGroup BootGroup) error {
+	_, err := bddb.DB.Exec(`INSERT INTO boot_groups (boot_group_id, boot_config_id, macs) VALUES ($1, $2, $3)`,
 		bootGroup.BootGroupId, bootGroup.BootConfig.BootConfigId, bootGroup.Macs)
 	return err
 }
