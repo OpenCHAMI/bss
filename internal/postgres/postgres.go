@@ -3,9 +3,12 @@ package postgres
 import (
 	"fmt"
 	"hash/fnv"
+	"regexp"
+	"strings"
 
 	"github.com/docker/distribution/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/lib/pq"
 )
 
@@ -64,6 +67,36 @@ func makeImageKey(imtype, path string) string {
 	return makeKey(imtype, fmt.Sprintf("%x", h.Sum(nil)))
 }
 
+// tagToColName extracts the field name from the JSON struct tag. Replace - with
+// _.
+// E.g: From `json:"params,omitempty"` comes `params`.
+func tagToColName(tag string) string {
+	re := regexp.MustCompile(`json:"([a-z0-9-]+)(?:,[a-z0-9-]+)*"`)
+	colName := re.FindString(tag)
+	return strings.Replace(colName, "-", "_", -1)
+}
+
+// fieldNameToColName converts the struct field name (in Pascal case) into
+// the format for the database column (in snake case).
+func fieldNameToColName(fieldName string) string {
+	firstCap := regexp.MustCompile(`(.)([A-Z][a-z]+)`)
+	allCaps := regexp.MustCompile(`([a-z0-9])([A-Z])`)
+	colName := firstCap.ReplaceAllString(fieldName, `${1}_${2}`)
+	colName = allCaps.ReplaceAllString(colName, `${1}_${2}`)
+	return strings.ToLower(colName)
+}
+
+// NewBootDB initializes a new BootDataDatabase and configures the tag/field
+// mapping of the sqlx database object it contains.
+func NewBootDB() (bddb BootDataDatabase) {
+	// Create a new mapper which will use the struct field tag "json" instead of "db",
+	// and ignore extra JSON config values, e.g. "omitempty".
+	bddb.DB.Mapper = reflectx.NewMapperTagFunc("json", fieldNameToColName, tagToColName)
+	return bddb
+}
+
+// Connect opens a new connections to a Postgres database and ensures it is reachable.
+// If not, an error is thrown.
 func Connect(host string, port uint, user, password string, ssl bool) (*sqlx.DB, error) {
 	var sslmode string
 	if ssl {

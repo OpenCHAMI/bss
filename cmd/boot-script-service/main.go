@@ -63,6 +63,7 @@ var (
 	datastoreBase = "" // If using ETCD
 	sqlHost       = "localhost"
 	sqlPort       = uint(5432)
+	bssdb         postgres.BootDataDatabase
 	hsmBase       = "http://localhost:27779"
 	nfdBase       = "http://localhost:28600"
 	serviceName   = "boot-script-service"
@@ -226,7 +227,9 @@ func sqlGetCreds() (user, password string, err error) {
 	return user, password, err
 }
 
-func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount, retryWait uint64) (bddb postgres.BootDataDatabase, err error) {
+func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount, retryWait uint64) (postgres.BootDataDatabase, error) {
+	var err error
+	bddb := postgres.NewBootDB()
 	ix := uint64(1)
 
 	for ; ix <= retryCount; ix++ {
@@ -354,7 +357,7 @@ func main() {
 		}
 
 		log.Printf("sqlInsecure: %v\n!sqlInsecure: %v", sqlInsecure, !sqlInsecure)
-		_, err = sqlOpen(sqlHost, sqlPort, sqlUser, sqlPassword, !sqlInsecure, sqlRetryCount, sqlRetryWait)
+		bssdb, err = sqlOpen(sqlHost, sqlPort, sqlUser, sqlPassword, !sqlInsecure, sqlRetryCount, sqlRetryWait)
 		if err != nil {
 			log.Fatalf("Access to Postgres database at %s:%d failed: %v\n", sqlHost, sqlPort, err)
 		}
