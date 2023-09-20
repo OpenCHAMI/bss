@@ -64,6 +64,7 @@ var (
 	sqlHost       = "localhost"
 	sqlPort       = uint(5432)
 	bssdb         postgres.BootDataDatabase
+	bssdbName     = "bssdb"
 	hsmBase       = "http://localhost:27779"
 	nfdBase       = "http://localhost:28600"
 	serviceName   = "boot-script-service"
@@ -228,13 +229,15 @@ func sqlGetCreds() (user, password string, err error) {
 }
 
 func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount, retryWait uint64) (postgres.BootDataDatabase, error) {
-	var err error
-	bddb := postgres.NewBootDB()
+	var (
+		err error
+		bddb postgres.BootDataDatabase
+	)
 	ix := uint64(1)
 
 	for ; ix <= retryCount; ix++ {
 		log.Printf("Attempting connection to Postgres (attempt %d)", ix)
-		bddb.DB, err = postgres.Connect(host, port, user, password, ssl)
+		bddb, err = postgres.Connect(host, port, user, password, ssl)
 		if err != nil {
 			log.Printf("ERROR opening opening connection to Postgres (attempt %d): %v\n", ix, err)
 		} else {
@@ -249,6 +252,13 @@ func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount
 		log.Printf("Initialized connection to Postgres database at %s:%d", host, port)
 	}
 	return bddb, err
+}
+
+func sqlClose() {
+	err := bssdb.Close()
+	if err != nil {
+		log.Fatalf("Error attempting tp close connection to Postgres: %v", err)
+	}
 }
 
 func getNotifierURL() string {
@@ -356,10 +366,18 @@ func main() {
 			log.Fatalf("ERROR: could not get Postgres credentials: %v\n", err)
 		}
 
+		// Initiate connection to Postgres.
 		log.Printf("sqlInsecure: %v\n!sqlInsecure: %v", sqlInsecure, !sqlInsecure)
 		bssdb, err = sqlOpen(sqlHost, sqlPort, sqlUser, sqlPassword, !sqlInsecure, sqlRetryCount, sqlRetryWait)
 		if err != nil {
 			log.Fatalf("Access to Postgres database at %s:%d failed: %v\n", sqlHost, sqlPort, err)
+		}
+		defer sqlClose()
+
+		// Create database and tables (if they do not exist).
+		err = bssdb.CreateDB(bssdbName)
+		if err != nil {
+			log.Fatalf("Creating Postgres database %q and tables failed: %v\n", bssdbName, err)
 		}
 	} else {
 		kvRetyCount, kvRetryWait, err := kvDefaultRetryConfig()

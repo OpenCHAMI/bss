@@ -23,8 +23,28 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-set -x
+usage() {
+	echo "Usage: $0 [-hn]"
+	echo " -h Print this help message."
+	echo " -n Pass --no-cache to docker-compose build."
+}
 
+nocache=false
+while getopts 'hn' opt; do
+	case "${opt}" in
+		h)
+			usage
+			;;
+		n)
+			nocache=true
+			;;
+		*)
+			usage >&2
+			;;
+	esac
+done
+
+set -x
 
 # Configure docker compose
 export COMPOSE_PROJECT_NAME=$RANDOM
@@ -45,7 +65,11 @@ function cleanup() {
 
 
 echo "Starting containers..."
-docker-compose build #--no-cache
+if [ "${nocache}" = true ]; then
+	docker-compose build --no-cache
+else
+	docker-compose build
+fi
 docker-compose up --exit-code-from hms-bss-test hms-bss-test
 
 test_result=$?

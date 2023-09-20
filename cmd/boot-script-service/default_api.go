@@ -175,38 +175,55 @@ func checkURL(u string) (string, error) {
 
 func BootparametersGetAll(w http.ResponseWriter, r *http.Request) {
 	var results []bssTypes.BootParams
-	for _, image := range GetKernelInfo() {
-		var bp bssTypes.BootParams
-		bp.Params = image.Params
-		bp.Kernel = image.Path
-		results = append(results, bp)
-	}
-	for _, image := range GetInitrdInfo() {
-		var bp bssTypes.BootParams
-		bp.Params = image.Params
-		bp.Initrd = image.Path
-		results = append(results, bp)
-	}
-	var names []string
-	if kvl, e := getTags(); e == nil {
-		for _, x := range kvl {
-			name := extractParamName(x)
-			names = append(names, name)
-			var bds BootDataStore
-			e = json.Unmarshal([]byte(x.Value), &bds)
-			if e == nil {
-				bd := bdConvert(bds)
-				var bp bssTypes.BootParams
-				bp.Hosts = append(bp.Hosts, name)
-				bp.Params = bd.Params
-				bp.Kernel = bd.Kernel.Path
-				bp.Initrd = bd.Initrd.Path
-				bp.CloudInit = bd.CloudInit
-				results = append(results, bp)
+	if useSQL {
+		var (
+			err error
+			nodes []string
+		)
+		results, err = bssdb.GetBootParamsAll()
+		if err != nil {
+			log.Printf("Yikes, I couldn't retrieve boot parameters from Postgres: %v\n", err)
+		}
+		for _, bp := range results {
+			for _, node := range bp.Hosts {
+				nodes = append(nodes, node)
 			}
 		}
+		debugf("Retrieved boot configs for nodes: %v", nodes)
+	} else {
+		for _, image := range GetKernelInfo() {
+			var bp bssTypes.BootParams
+			bp.Params = image.Params
+			bp.Kernel = image.Path
+			results = append(results, bp)
+		}
+		for _, image := range GetInitrdInfo() {
+			var bp bssTypes.BootParams
+			bp.Params = image.Params
+			bp.Initrd = image.Path
+			results = append(results, bp)
+		}
+		var names []string
+		if kvl, e := getTags(); e == nil {
+			for _, x := range kvl {
+				name := extractParamName(x)
+				names = append(names, name)
+				var bds BootDataStore
+				e = json.Unmarshal([]byte(x.Value), &bds)
+				if e == nil {
+					bd := bdConvert(bds)
+					var bp bssTypes.BootParams
+					bp.Hosts = append(bp.Hosts, name)
+					bp.Params = bd.Params
+					bp.Kernel = bd.Kernel.Path
+					bp.Initrd = bd.Initrd.Path
+					bp.CloudInit = bd.CloudInit
+					results = append(results, bp)
+				}
+			}
+		}
+		debugf("Retrieved names: %v", names)
 	}
-	debugf("Retreived names: %v", names)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(results)

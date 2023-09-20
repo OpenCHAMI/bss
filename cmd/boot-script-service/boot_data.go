@@ -340,6 +340,12 @@ func extractParamName(x hmetcd.Kvi_KV) (ret string) {
 }
 
 func StoreNew(bp bssTypes.BootParams) (error, string) {
+	// postgres.Add will handle duplicates, and it is called in New().
+	// Therefore, if Postgres is enabled, simply call Store().
+	if useSQL {
+		return Store(bp)
+	}
+
 	item := ""
 	// Go through the entire struct.  We must be storing to new hosts or this
 	// request must fail.
@@ -392,6 +398,16 @@ func StoreNew(bp bssTypes.BootParams) (error, string) {
 
 func Store(bp bssTypes.BootParams) (error, string) {
 	debugf("Store(%v)\n", bp)
+
+	if useSQL {
+		debugf("postgres.Add(%v)\n", bp)
+		result, err := bssdb.Add(bp)
+		if err != nil {
+			return err, ""
+		}
+		debugf("postgres.Add result: %v\n", result)
+		return err, uuid.New().String()
+	}
 
 	var kernel_id, initrd_id string
 	if bp.Kernel != "" {

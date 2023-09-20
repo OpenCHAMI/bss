@@ -32,4 +32,4 @@ COPY test/ct/postgres /postgres
 WORKDIR /postgres
 
 # Run unit tests.
-CMD ["--test", "/postgres/test.hurl"]
+CMD ["/postgres/test.hurl"]
