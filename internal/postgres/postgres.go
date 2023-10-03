@@ -694,6 +694,143 @@ func (bddb BootDataDatabase) GetBootParamsAll() ([]bssTypes.BootParams, error) {
 	return results, err
 }
 
-//func (bddb BootDataDatabase) GetBootParamsByNode(macs, xnames []string, nids []int32) ([]bssTypes.BootParams, error) {
-//	var results []bssTypes.BootParams
-//}
+func (bddb BootDataDatabase) GetBootParamsByName(names []string) ([]bssTypes.BootParams, error) {
+	var results []bssTypes.BootParams
+
+	// If input is empty, so is the output.
+	if len(names) == 0 {
+		return results, nil
+	}
+
+	qstr := "SELECT n.xname, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM nodes AS n" +
+		" LEFT JOIN boot_group_assignments AS bga ON n.id=bga.node_id" +
+		" JOIN boot_groups AS bg on bga.boot_group_id=bg.id" +
+		" JOIN boot_configs AS bc ON bg.boot_config_id=bc.id" +
+		" WHERE n.xname IN " + stringSliceToSql(names) +
+		";"
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("postgres.GetBootParamsByName: Unable to query database: %v", err)
+		return results, err
+	}
+	defer rows.Close()
+
+	// rows.Next() returns false if either there is no next result (i.e. it
+	// doesn't exist) or an error occurred. We return rows.Err() to
+	// distinguish between the two cases.
+	for rows.Next() {
+		var (
+			name string
+			bp bssTypes.BootParams
+		)
+		err = rows.Scan(&name, &bp.Kernel, &bp.Initrd, &bp.Params)
+		if err != nil {
+			err = fmt.Errorf("postgres.GetBootParamsByName: Could not scan SQL result: %v", err)
+			return results, err
+		}
+		bp.Hosts = append(bp.Hosts, name)
+
+		results = append(results, bp)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("postgres.GetBootParamsByName: Could not parse query results: %v", err)
+		return results, err
+	}
+
+	return results, err
+}
+
+func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootParams, error) {
+	var results []bssTypes.BootParams
+
+	// If inout is empty, so is the output.
+	if len(macs) == 0 {
+		return results, nil
+	}
+
+	qstr := "SELECT n.boot_mac, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM nodes AS n" +
+		" LEFT JOIN boot_group_assignments AS bga ON n.id=bga.node_id" +
+		" JOIN boot_groups AS bg on bga.boot_group_id=bg.id" +
+		" JOIN boot_configs AS bc ON bg.boot_config_id=bc.id" +
+		" WHERE n.boot_mac IN " + stringSliceToSql(macs) +
+		";"
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("postgres.GetBootParamsByMac: Unable to query database: %v", err)
+		return results, err
+	}
+	defer rows.Close()
+
+	// rows.Next() returns false if either there is no next result (i.e. it
+	// doesn't exist) or an error occurred. We return rows.Err() to
+	// distinguish between the two cases.
+	for rows.Next() {
+		var (
+			mac string
+			bp bssTypes.BootParams
+		)
+		err = rows.Scan(&mac, &bp.Kernel, &bp.Initrd, &bp.Params)
+		if err != nil {
+			err = fmt.Errorf("postgres.GetBootParamsByMac: Could not scan SQL result: %v", err)
+			return results, err
+		}
+		bp.Macs = append(bp.Macs, mac)
+
+		results = append(results, bp)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("postgres.GetBootParamsByName: Could not parse query results: %v", err)
+		return results, err
+	}
+
+	return results, err
+}
+
+func (bddb BootDataDatabase) GetBootParamsByNid(nids []int32) ([]bssTypes.BootParams, error) {
+	var results []bssTypes.BootParams
+
+	// If input is empty, so is the output.
+	if len(nids) == 0 {
+		return results, nil
+	}
+
+	qstr := "SELECT n.nid, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM nodes AS n" +
+		" LEFT JOIN boot_group_assignments AS bga ON n.id=bga.node_id" +
+		" JOIN boot_groups AS bg on bga.boot_group_id=bg.id" +
+		" JOIN boot_configs AS bc ON bg.boot_config_id=bc.id" +
+		" WHERE n.nid IN " + int32SliceToSql(nids) +
+		";"
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("postgres.GetBootParamsByNid: Unable to query database: %v", err)
+		return results, err
+	}
+	defer rows.Close()
+
+	// rows.Next() returns false if either there is no next result (i.e. it
+	// doesn't exist) or an error occurred. We return rows.Err() to
+	// distinguish between the two cases.
+	for rows.Next() {
+		var (
+			nid int32
+			bp bssTypes.BootParams
+		)
+		err = rows.Scan(&nid, &bp.Kernel, &bp.Initrd, &bp.Params)
+		if err != nil {
+			err = fmt.Errorf("postgres.GetBootParamsByNid: Could not scan SQL result: %v", err)
+			return results, err
+		}
+		bp.Nids = append(bp.Nids, nid)
+
+		results = append(results, bp)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("postgres.GetBootParamsByNid: Could not parse query results: %v", err)
+		return results, err
+	}
+
+	return results, err
+}

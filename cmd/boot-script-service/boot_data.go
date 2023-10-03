@@ -941,6 +941,27 @@ func LookupByName(name string) (BootData, SMComponent) {
 		comp_name = comp.ID
 		role = comp.Role
 	}
+	if useSQL {
+		var result BootData
+		bps, err := bssdb.GetBootParamsByName([]string{name})
+		if err != nil {
+			err = fmt.Errorf("Could not retrieve boot parameters with name %q: %v", name, err)
+			log.Printf("ERROR: %v", err)
+			return result, comp
+		}
+		if len(bps) == 0 {
+			// Not found.
+			log.Printf("WARNING: Name %q did not return any results.", name)
+			return result, comp
+		} else if len(bps) > 1 {
+			debugf("BootParams returned: %v", bps)
+			log.Printf("WARNING: More than 1 node found for name %q, taking first one: %v", name, bps[0])
+		}
+		result.Kernel = ImageData{bps[0].Kernel, ""}
+		result.Initrd = ImageData{bps[0].Initrd, ""}
+		result.Params = bps[0].Params
+		return result, comp
+	}
 	return lookup(comp_name, name, role, DefaultTag), comp
 }
 
@@ -951,6 +972,27 @@ func LookupByMAC(mac string) (BootData, SMComponent) {
 	if ok {
 		comp_name = comp.ID
 		role = comp.Role
+	}
+	if useSQL {
+		var result BootData
+		bps, err := bssdb.GetBootParamsByMac([]string{mac})
+		if err != nil {
+			err = fmt.Errorf("Could not retrieve boot parameters with mac %q: %v", mac, err)
+			log.Printf("ERROR: %v", err)
+			return result, comp
+		}
+		if len(bps) == 0 {
+			// Not found.
+			log.Printf("WARNING: MAC %q did not return any results.", mac)
+			return result, comp
+		} else if len(bps) > 1 {
+			debugf("BootParams returned: %v", bps)
+			log.Printf("WARNING: More than 1 node found for MAC %q, taking first one: %v", mac, bps[0])
+		}
+		result.Kernel = ImageData{bps[0].Kernel, ""}
+		result.Initrd = ImageData{bps[0].Initrd, ""}
+		result.Params = bps[0].Params
+		return result, comp
 	}
 	return lookup(comp_name, mac, role, DefaultTag), comp
 }
@@ -963,6 +1005,27 @@ func LookupByNid(nid int) (BootData, SMComponent) {
 	if ok {
 		comp_name = comp.ID
 		role = comp.Role
+	}
+	if useSQL {
+		var result BootData
+		bps, err := bssdb.GetBootParamsByNid([]int32{int32(nid)})
+		if err != nil {
+			err = fmt.Errorf("Could not retrieve boot parameters with NID %d: %v", nid, err)
+			log.Printf("ERROR: %v", err)
+			return result, comp
+		}
+		if len(bps) == 0 {
+			// Not found.
+			log.Printf("WARNING: NID %d did not return any results.", nid)
+			return result, comp
+		} else if len(bps) > 1 {
+			debugf("BootParams returned: %v", bps)
+			log.Printf("WARNING: More than 1 node found for NID %d, taking first one: %v", nid, bps[0])
+		}
+		result.Kernel = ImageData{bps[0].Kernel, ""}
+		result.Initrd = ImageData{bps[0].Initrd, ""}
+		result.Params = bps[0].Params
+		return result, comp
 	}
 	return lookup(comp_name, nid_str, role, DefaultTag), comp
 }
