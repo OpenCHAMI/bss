@@ -402,14 +402,14 @@ func (bddb BootDataDatabase) CreateDB(name string) (err error) {
 	return err
 }
 
-func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (map[string]string, error) {
+func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams) (map[string]string, error) {
 	result := make(map[string]string)
 
 	// See if group name exists, if passed.
 	qstr := fmt.Sprintf(`SELECT * FROM boot_groups WHERE name IN %s;`, stringSliceToSql(bp.Hosts))
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("postgres.Add: Unable to query boot database: %v", err)
+		err = fmt.Errorf("Unable to query boot database: %v", err)
 		return result, err
 	}
 	defer rows.Close()
@@ -422,14 +422,14 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (map[string]string, err
 		var bg BootGroup
 		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
 		if err != nil {
-			err = fmt.Errorf("postgres.Add: Could not scan SQL result: %v", err)
+			err = fmt.Errorf("Could not scan SQL result: %v", err)
 			return result, err
 		}
 		bgMap[bg.Name] = bg
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("postgres.Add: Could not parse query results: %v", err)
+		err = fmt.Errorf("Could not parse query results: %v", err)
 		return result, err
 	}
 	// If not, we are done processing the list of names. Check matches, if any.
@@ -497,9 +497,16 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (map[string]string, err
 		}
 	}
 
+	// We don't create new boot groups in BSS (TODO?), so result
+	// is empty if we don't find an existing boot group to configure.
+	return result, err
+}
+
+func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[string]string, error) {
+	result := make(map[string]string)
+
 	// Check nodes table for any nodes that having a matching XName, MAC, or NID.
-	var existingNodeList []Node
-	existingNodeList, err = bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
+	existingNodeList, err := bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
 	if err != nil {
 		err = fmt.Errorf("postgres.Add: %v", err)
 		return result, err
@@ -623,6 +630,31 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (map[string]string, err
 		return result, err
 	}
 
+	return result, err
+}
+
+func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]string, err error) {
+	// First, see if we are adding the config for a boot group that
+	// already exists.
+	result, err = bddb.addBootConfigByGroup(bp)
+	if err != nil {
+		err = fmt.Errorf("postgres.Add: %v", err)
+		return result, err
+	}
+	// If boot config was added for a boot group, return the result.
+	// Otherwise, we move on to add the config for node(s) if it/they
+	// exist(s).
+	if len(result) > 0 {
+		return result, err
+	}
+
+	// If the no config was added for a boot group, then we try to
+	// add a new node with the config, if it doesn't already exist.
+	result, err = bddb.addBootConfigByNode(bp)
+	if err != nil {
+		err = fmt.Errorf("postgres.Add: %v", err)
+		return result, err
+	}
 	return result, err
 }
 
