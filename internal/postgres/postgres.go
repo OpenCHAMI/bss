@@ -298,6 +298,120 @@ func (bddb BootDataDatabase) GetNodesByItems(macs, xnames []string, nids []int32
 	return nodeList, err
 }
 
+func (bddb BootDataDatabase) GetBootConfigsAll() ([]BootGroup, []BootConfig, int, error) {
+	bgResults := []BootGroup{}
+	bcResults := []BootConfig{}
+	numResults := 0
+
+	qstr := "SELECT bg.id, bg.name, bg.description, bc.id, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM boot_groups AS bg" +
+		" LEFT JOIN boot_configs AS bc" +
+		" WHERE bg.boot_group_id=bc.id" +
+		";"
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("postgres.GetBootConfigsAll: Unable to query database: %v", err)
+		return bgResults, bcResults, numResults, err
+	}
+	defer rows.Close()
+
+	// rows.Next() returns false if either there is no next result (i.e. it
+	// doesn't exist) or an error occurred. We return rows.Err() to
+	// distinguish between the two cases.
+	for rows.Next() {
+		var (
+			bg BootGroup
+			bc BootConfig
+		)
+		err = rows.Scan(&bg.Id, &bg.Name, &bg.Description,
+			&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
+		if err != nil {
+			err = fmt.Errorf("postgres.GetBootConfigsAll: Could not scan SQL result: %v", err)
+			return bgResults, bcResults, numResults, err
+		}
+		bg.BootConfigId = bc.Id
+
+		bgResults = append(bgResults, bg)
+		bcResults = append(bcResults, bc)
+		numResults++
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("postgres.GetBootConfigsAll: Could not parse query results: %v", err)
+		return bgResults, bcResults, numResults, err
+	}
+
+	return bgResults, bcResults, numResults, err
+}
+
+func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline string) ([]BootGroup, []BootConfig, int, error) {
+	// If no items are specified, get all boot configs, mapped by boot group.
+	if kernelUri == "" && initrdUri == "" && cmdline == "" {
+		return bddb.GetBootConfigsAll()
+	}
+
+	bgResults := []BootGroup{}
+	bcResults := []BootConfig{}
+	numResults := 0
+
+	qstr := "SELECT bg.id, bg.name, bg.description, bc.id, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM boot_groups AS bg" +
+		" LEFT JOIN boot_configs AS bc" +
+		" ON bg.boot_config_id=bc.id" +
+		" WHERE ("
+	lengths := []int{len(kernelUri), len(initrdUri), len(cmdline)}
+	for first, qsep, i := true, "", 0; i < len(lengths); i++ {
+		if lengths[i] > 0 {
+			if !first {
+				qstr += " OR"
+				qsep = " "
+			}
+			switch i {
+			case 0:
+				qstr += qsep + fmt.Sprintf("kernel_uri='%s'", kernelUri)
+			case 1:
+				qstr += qsep + fmt.Sprintf("initrd_uri='%s'", initrdUri)
+			case 2:
+				qstr += qsep + fmt.Sprintf("cmdline='%s'", cmdline)
+			}
+			first = false
+		}
+	}
+	qstr += ");"
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("postgres.GetBootConfigsAll: Unable to query database: %v", err)
+		return bgResults, bcResults, numResults, err
+	}
+	defer rows.Close()
+
+	// rows.Next() returns false if either there is no next result (i.e. it
+	// doesn't exist) or an error occurred. We return rows.Err() to
+	// distinguish between the two cases.
+	for rows.Next() {
+		var (
+			bg BootGroup
+			bc BootConfig
+		)
+		err = rows.Scan(&bg.Id, &bg.Name, &bg.Description,
+			&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
+		if err != nil {
+			err = fmt.Errorf("postgres.GetBootConfigsAll: Could not scan SQL result: %v", err)
+			return bgResults, bcResults, numResults, err
+		}
+		bg.BootConfigId = bc.Id
+
+		bgResults = append(bgResults, bg)
+		bcResults = append(bcResults, bc)
+		numResults++
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("postgres.GetBootConfigsAll: Could not parse query results: %v", err)
+		return bgResults, bcResults, numResults, err
+	}
+
+	return bgResults, bcResults, numResults, err
+}
+
 func stringSliceToSql(ss []string) string {
 	if len(ss) == 0 {
 		return "('')"
@@ -402,15 +516,19 @@ func (bddb BootDataDatabase) CreateDB(name string) (err error) {
 	return err
 }
 
-func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams) (map[string]string, error) {
-	result := make(map[string]string)
+func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams, ebgl []BootGroup, ebcl []BootConfig) (map[string]string, error) {
+	results := make(map[string]string)
 
 	// See if group name exists, if passed.
-	qstr := fmt.Sprintf(`SELECT * FROM boot_groups WHERE name IN %s;`, stringSliceToSql(bp.Hosts))
+	var existingBgNames []string
+	for _, ebn := range bp.Hosts {
+		existingBgNames = append(existingBgNames, fmt.Sprintf("BootGroup(%s)", ebn))
+	}
+	qstr := fmt.Sprintf(`SELECT * FROM boot_groups WHERE name IN %s;`, stringSliceToSql(existingBgNames))
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
 		err = fmt.Errorf("Unable to query boot database: %v", err)
-		return result, err
+		return results, err
 	}
 	defer rows.Close()
 
@@ -423,14 +541,14 @@ func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams) (map[s
 		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
 		if err != nil {
 			err = fmt.Errorf("Could not scan SQL result: %v", err)
-			return result, err
+			return results, err
 		}
 		bgMap[bg.Name] = bg
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
 		err = fmt.Errorf("Could not parse query results: %v", err)
-		return result, err
+		return results, err
 	}
 	// If not, we are done processing the list of names. Check matches, if any.
 	if len(bgMap) > 0 {
@@ -439,25 +557,24 @@ func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams) (map[s
 		for bgName, _ := range bgMap {
 			bgNames = append(bgNames, bgName)
 		}
-		existingBootGroups, nonExistingBootGroups := getMatches(bp.Hosts, bgNames)
-
-		// Add existing BootGroups to result.
-		for _, bgName := range existingBootGroups {
-			result[bgName] = bgMap[bgName].Id
-		}
+		_, nonExistingBootGroups := getMatches(bp.Hosts, bgNames)
 
 		// We don't change the BootConfig of an existing BootGroup
 		// since we are adding, not updating. Therefore, we only
-		// create BootConfigs for new BootGroups.
+		// create a new BootConfig for new BootGroups.
 		//
-		// Create BootConfigs for each new BootGroup.
-		var bcList []BootConfig
+		// Create BootConfig for any new BootGroups.
+		var (
+			bcList []BootConfig
+			bgList []BootGroup
+		)
 		for _, bgName := range nonExistingBootGroups {
+			// Create boot config for node group.
 			var bc BootConfig
 			bc, err = NewBootConfig(bp.Kernel, bp.Initrd, bp.Params)
 			if err != nil {
-				err = fmt.Errorf("postgres.Add: Could not create BootConfig: %v", err)
-				return result, err
+				err = fmt.Errorf("Could not create BootConfig: %v", err)
+				return results, err
 			}
 
 			// Add new BootConfig to list so it can be added to the boot_configs
@@ -470,36 +587,38 @@ func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams) (map[s
 				bgMap[bgName] = tempBg
 			}
 
-			// Add new BootGroup to result.
-			result[bgName] = bgMap[bgName].Id
+			// Create boot group for node group.
+			var bg BootGroup
+			newBgName := fmt.Sprintf("BootGroup(%s)", bgName)
+			bgDesc := fmt.Sprintf("Boot group with name=%q", bgName)
+			bg = NewBootGroup(bc.Id, newBgName, bgDesc)
+
+			// Add BootGroup/BootConfig IDs to results.
+			results[bg.Id] = bc.Id
 		}
 
-		// Add new BootGroups to boot_groups table and result.
-		var newBootGroups []BootGroup
-		for _, bgName := range nonExistingBootGroups {
-			// Add new BootGroup to list to be used in SQL query.
-			newBootGroups = append(newBootGroups, bgMap[bgName])
-
-			// Add new BootGroup to result.
-			result[bgName] = bgMap[bgName].Id
-		}
-		err = bddb.addBootGroups(newBootGroups)
-		if err != nil {
-			err = fmt.Errorf("postgres.Add: %v", err)
-			return result, err
+		// Add new BootGroups to boot_groups table.
+		if len(bgList) > 0 {
+			err = bddb.addBootGroups(bgList)
+			if err != nil {
+				err = fmt.Errorf("postgres.Add: %v", err)
+				return results, err
+			}
 		}
 
-		// Add new BootConfigs.
-		err = bddb.addBootConfigs(bcList)
-		if err != nil {
-			err = fmt.Errorf("postgres.Add: %v", err)
-			return result, err
+		// Add new BootConfigs to boot_configs table.
+		if len(bcList) > 0 {
+			err = bddb.addBootConfigs(bcList)
+			if err != nil {
+				err = fmt.Errorf("postgres.Add: %v", err)
+				return results, err
+			}
 		}
 	}
 
-	// We don't create new boot groups in BSS (TODO?), so result
+	// We don't create new boot groups in BSS (TODO?), so results
 	// is empty if we don't find an existing boot group to configure.
-	return result, err
+	return results, err
 }
 
 func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[string]string, error) {
@@ -564,34 +683,53 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 		}
 	}
 
-	// Create BootConfig, BootGroup, and BootGroupAssignment for each node that we are
-	// adding. Add each to their own list so they can submitted to the database via an
-	// SQL query.
+	// Check to see if a node (not group) BootGroup and BootConfig exist with this
+	// configuration. We will only add a new per-node BootGroup/BootConfig if one
+	// does not already exist.
 	var (
-		bcList []BootConfig
-		bgList []BootGroup
-		bgaList []BootGroupAssignment
+		existingBgList []BootGroup
+		existingBcList []BootConfig
+		numResults     int
+		bg             BootGroup
+		bc             BootConfig
+		bgaList        []BootGroupAssignment
 	)
-	for _, node := range nodesToAdd {
-		// Create BootConfig for node.
-		var bc BootConfig
-		bc, err = NewBootConfig(bp.Kernel, bp.Initrd, bp.Params)
-		if err != nil {
-			err = fmt.Errorf("postgres.Add: %v", err)
-			return result, err
+	existingBgList, existingBcList, numResults, err = bddb.GetBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
+	if err != nil {
+		err = fmt.Errorf("postgres.Add: %v", err)
+		return result, err
+	}
+	// Create boot group and boot config with these parameters so we can compare them
+	// with results from the database to see if they already exist.
+	bgName := fmt.Sprintf("BootGroup(kernel=%q,initrd=%q,params=%q)", bp.Kernel, bp.Initrd, bp.Params)
+	bgDesc := fmt.Sprintf("Boot group for nodes with kernel=%q initrd=%q params=%q", bp.Kernel, bp.Initrd, bp.Params)
+	bc, err = NewBootConfig(bp.Kernel, bp.Initrd, bp.Params)
+	if err != nil {
+		err = fmt.Errorf("postgres.Add: %v", err)
+		return result, err
+	}
+	bg = NewBootGroup(bc.Id, bgName, bgDesc)
+	addBcAndBg := true
+	for i := 0; i < numResults; i++ {
+		if bgName == existingBgList[i].Name &&
+			bgDesc == existingBgList[i].Description &&
+			bc.KernelUri == existingBcList[i].KernelUri &&
+			bc.InitrdUri == existingBcList[i].InitrdUri &&
+			bc.Cmdline == existingBcList[i].Cmdline {
+
+			// A BootConfig/BootGroup with this configuration exists.
+			// We will not add new ones.
+			bc = existingBcList[i]
+			bg = existingBgList[i]
+			addBcAndBg = true
+			break
 		}
-		bcList = append(bcList, bc)
+	}
 
-		// Create BootGroup for node.
-		var bg BootGroup
-		bgName := fmt.Sprintf("BootGroup%v", node)
-		bgDesc := fmt.Sprintf("Boot group for node: %v", node)
-		bg = NewBootGroup(bc.Id, bgName, bgDesc)
-		bgList = append(bgList, bg)
-
-		// Also add new BootGroup to result.
-		result[bg.Name] = bg.Id
-
+	// If an existing BootConfig/BootGroup exists for this kernel/initrd/cmdline,
+	// set bg and bc to it and create BootGroupAssignments for these nodes,
+	// assigning them to the existing config.
+	for _, node := range nodesToAdd {
 		// Create BootGroupAssignment for node.
 		var bga BootGroupAssignment
 		bga, err = NewBootGroupAssignment(bg.Id, node.Id)
@@ -602,22 +740,29 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 		bgaList = append(bgaList, bga)
 	}
 
+	// Only add BootConfig/BootGroup if an existing one was not found based on
+	// the kernel/initrd uri and params.
+	if addBcAndBg {
+		// Add new boot configs to boot_configs table.
+		err = bddb.addBootConfigs([]BootConfig{bc})
+		if err != nil {
+			err = fmt.Errorf("postgres.Add: %v", err)
+			return result, err
+		}
+
+		// Add new boot groups to boot_groups table.
+		err = bddb.addBootGroups([]BootGroup{bg})
+		if err != nil {
+			err = fmt.Errorf("postgres.Add: %v", err)
+			return result, err
+		}
+
+		// Add BootGroup/BootConfig to result.
+		result[bg.Id] = bc.Id
+	}
+
 	// Add new nodes to nodes table.
 	err = bddb.addNodes(nodesToAdd)
-	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
-		return result, err
-	}
-
-	// Add new boot configs to boot_configs table.
-	err = bddb.addBootConfigs(bcList)
-	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
-		return result, err
-	}
-
-	// Add new boot groups to boot_groups table.
-	err = bddb.addBootGroups(bgList)
 	if err != nil {
 		err = fmt.Errorf("postgres.Add: %v", err)
 		return result, err
@@ -634,19 +779,32 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 }
 
 func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]string, err error) {
-	// First, see if we are adding the config for a boot group that
-	// already exists.
-	result, err = bddb.addBootConfigByGroup(bp)
+	// Check if BootConfig/BootGroup exists.
+	var (
+		//existingBgList []BootGroup
+		//existingBcList []BootConfig
+		//numResults     int
+	)
+	//existingBgList, existingBcList, numResults, err = bddb.GetBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
+	_, _, _, err = bddb.GetBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
 	if err != nil {
 		err = fmt.Errorf("postgres.Add: %v", err)
 		return result, err
 	}
+
+	// First, see if we are adding the config for a boot group that
+	// already exists.
+	//result, err = bddb.addBootConfigByGroup(bp, existingBgList, existingBcList)
+	//if err != nil {
+	//	err = fmt.Errorf("postgres.Add: %v", err)
+	//	return result, err
+	//}
 	// If boot config was added for a boot group, return the result.
 	// Otherwise, we move on to add the config for node(s) if it/they
 	// exist(s).
-	if len(result) > 0 {
-		return result, err
-	}
+	//if len(result) > 0 {
+	//	return result, err
+	//}
 
 	// If the no config was added for a boot group, then we try to
 	// add a new node with the config, if it doesn't already exist.
