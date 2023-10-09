@@ -14,7 +14,7 @@ import (
 
 const dbName = "bssdb"
 
-type Node struct{
+type Node struct {
 	Id      string `json:"id"`
 	BootMac string `json:"boot_mac,omitempty"`
 	Xname   string `json:"xname,omitempty"`
@@ -41,7 +41,7 @@ type BootGroupAssignment struct {
 }
 
 type BootDataDatabase struct {
-	DB         *sqlx.DB
+	DB *sqlx.DB
 	// TODO: Utilize cache.
 	//ImageCache map[string]Image
 }
@@ -88,7 +88,7 @@ func fieldNameToColName(fieldName string) string {
 func Connect(host string, port uint, user, password string, ssl bool) (BootDataDatabase, error) {
 	var (
 		sslmode string
-		bddb BootDataDatabase
+		bddb    BootDataDatabase
 	)
 	if ssl {
 		sslmode = "verify-full"
@@ -302,18 +302,18 @@ func stringSliceToSql(ss []string) string {
 	if len(ss) == 0 {
 		return "('')"
 	}
-        sep := ""
-        s := "("
-        for i, st := range ss {
-                s += sep + fmt.Sprintf("'%s'", st)
-                if i == len(ss)-1 {
-                        sep = ""
-                } else {
-                        sep = ", "
-                }
-        }
-        s += ")"
-        return s
+	sep := ""
+	s := "("
+	for i, st := range ss {
+		s += sep + fmt.Sprintf("'%s'", st)
+		if i == len(ss)-1 {
+			sep = ""
+		} else {
+			sep = ", "
+		}
+	}
+	s += ")"
+	return s
 }
 
 func int32SliceToSql(is []int32) string {
@@ -360,15 +360,15 @@ func (bddb BootDataDatabase) CreateDB(name string) (err error) {
 	// this workaround.
 	// Source: https://stackoverflow.com/a/18389184
 	execStr := "DO" +
-	" $do$" +
-	" BEGIN" +
-	" 	IF EXISTS (SELECT FROM pg_database WHERE datname = '" + name + "') THEN" +
-	" 		RAISE NOTICE 'Database already exists';  -- optional" +
-	" 	ELSE" +
-	" 		PERFORM dblink_exec('dbname=' || current_database(), create_database('" + name + "');" +
-	" 	END IF;" +
-	" END" +
-	" $do$;"
+		" $do$" +
+		" BEGIN" +
+		" 	IF EXISTS (SELECT FROM pg_database WHERE datname = '" + name + "') THEN" +
+		" 		RAISE NOTICE 'Database already exists';  -- optional" +
+		" 	ELSE" +
+		" 		PERFORM dblink_exec('dbname=' || current_database(), create_database('" + name + "');" +
+		" 	END IF;" +
+		" END" +
+		" $do$;"
 
 	// Create the tables.
 	execStr = `CREATE TABLE IF NOT EXISTS nodes (
@@ -680,7 +680,7 @@ func (bddb BootDataDatabase) GetBootParamsAll() ([]bssTypes.BootParams, error) {
 	for rows.Next() {
 		var (
 			node Node
-			bc BootConfig
+			bc   BootConfig
 			bgid string
 		)
 		err = rows.Scan(&node.Id, &node.BootMac, &node.Xname, &node.Nid,
@@ -753,7 +753,7 @@ func (bddb BootDataDatabase) GetBootParamsByName(names []string) ([]bssTypes.Boo
 	for rows.Next() {
 		var (
 			name string
-			bp bssTypes.BootParams
+			bp   bssTypes.BootParams
 		)
 		err = rows.Scan(&name, &bp.Kernel, &bp.Initrd, &bp.Params)
 		if err != nil {
@@ -800,7 +800,7 @@ func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootP
 	for rows.Next() {
 		var (
 			mac string
-			bp bssTypes.BootParams
+			bp  bssTypes.BootParams
 		)
 		err = rows.Scan(&mac, &bp.Kernel, &bp.Initrd, &bp.Params)
 		if err != nil {
@@ -847,7 +847,7 @@ func (bddb BootDataDatabase) GetBootParamsByNid(nids []int32) ([]bssTypes.BootPa
 	for rows.Next() {
 		var (
 			nid int32
-			bp bssTypes.BootParams
+			bp  bssTypes.BootParams
 		)
 		err = rows.Scan(&nid, &bp.Kernel, &bp.Initrd, &bp.Params)
 		if err != nil {
