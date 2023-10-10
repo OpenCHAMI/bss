@@ -723,7 +723,7 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 	var (
 		groupNames []string
 		xNames     []string
-		reXName    = regexp.MustCompile(`^x([0-9]{1,4})c([0-7])b([0])$`)
+		reXName    = regexp.MustCompile(`^x([0-9]{1,4})c([0-7])(s([0-9]{1,4}))?b([0])(n([0-9]{1,4}))?$`)
 	)
 	for _, name := range bp.Hosts {
 		match := reXName.FindString(name)
