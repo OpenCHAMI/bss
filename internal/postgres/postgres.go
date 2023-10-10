@@ -515,12 +515,12 @@ func (bddb BootDataDatabase) CreateDB(name string) (err error) {
 	return err
 }
 
-func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams, ebgl []BootGroup, ebcl []BootConfig) (map[string]string, error) {
+func (bddb BootDataDatabase) addBootConfigByGroup(groupNames []string, kernelUri, initrdUri, cmdline string) (map[string]string, error) {
 	results := make(map[string]string)
 
 	// See if group name exists, if passed.
 	var existingBgNames []string
-	for _, ebn := range bp.Hosts {
+	for _, ebn := range groupNames {
 		existingBgNames = append(existingBgNames, fmt.Sprintf("BootGroup(%s)", ebn))
 	}
 	qstr := fmt.Sprintf(`SELECT * FROM boot_groups WHERE name IN %s;`, stringSliceToSql(existingBgNames))
@@ -556,7 +556,7 @@ func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams, ebgl [
 		for bgName, _ := range bgMap {
 			bgNames = append(bgNames, bgName)
 		}
-		_, nonExistingBootGroups := getMatches(bp.Hosts, bgNames)
+		_, nonExistingBootGroups := getMatches(groupNames, bgNames)
 
 		// We don't change the BootConfig of an existing BootGroup
 		// since we are adding, not updating. Therefore, we only
@@ -570,7 +570,7 @@ func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams, ebgl [
 		for _, bgName := range nonExistingBootGroups {
 			// Create boot config for node group.
 			var bc BootConfig
-			bc, err = NewBootConfig(bp.Kernel, bp.Initrd, bp.Params)
+			bc, err = NewBootConfig(kernelUri, initrdUri, cmdline)
 			if err != nil {
 				err = fmt.Errorf("Could not create BootConfig: %v", err)
 				return results, err
@@ -620,67 +620,9 @@ func (bddb BootDataDatabase) addBootConfigByGroup(bp bssTypes.BootParams, ebgl [
 	return results, err
 }
 
-func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[string]string, error) {
+func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, initrdUri, cmdline string) (map[string]string, error) {
+	var err error
 	result := make(map[string]string)
-
-	// Check nodes table for any nodes that having a matching XName, MAC, or NID.
-	existingNodeList, err := bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
-	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
-		return result, err
-	}
-
-	// Since we are adding nodes, we will skip over existing nodes. It is assumed that existing
-	// nodes already have a BootGroup with a corresponding BootConfig and a BootGroupAssignment.
-	// So, when we add a new node, we will create a BootConfig, a BootGroup for that node, and
-	// a BootGroupAssignment asigning that node to that BootGroup.
-
-	// Determine nodes we need to add (ones that don't already exist).
-	//
-	// Nodes can be specified by XName, NID, or MAC address, so we query the list of existing
-	// nodes using all three.
-	var nodesToAdd []Node
-	switch {
-	case len(bp.Macs) > 0:
-		// Make map of existing nodes with MAC address as the key.
-		existingNodeMap := make(map[string]Node)
-		for _, n := range existingNodeList {
-			existingNodeMap[n.BootMac] = n
-		}
-
-		// Store list of nodes to add.
-		for _, mac := range bp.Macs {
-			if existingNodeMap[mac] == (Node{}) {
-				nodesToAdd = append(nodesToAdd, NewNode(mac, "", 0))
-			}
-		}
-	case len(bp.Hosts) > 0:
-		// Make map of existing nodes with Xname as the key.
-		existingNodeMap := make(map[string]Node)
-		for _, n := range existingNodeList {
-			existingNodeMap[n.Xname] = n
-		}
-
-		// Store list of nodes to add.
-		for _, xname := range bp.Hosts {
-			if existingNodeMap[xname] == (Node{}) {
-				nodesToAdd = append(nodesToAdd, NewNode("", xname, 0))
-			}
-		}
-	case len(bp.Nids) > 0:
-		// Make map of existing nodes with Nid as the key.
-		existingNodeMap := make(map[int32]Node)
-		for _, n := range existingNodeList {
-			existingNodeMap[n.Nid] = n
-		}
-
-		// Store list of nodes to add.
-		for _, nid := range bp.Nids {
-			if existingNodeMap[nid] == (Node{}) {
-				nodesToAdd = append(nodesToAdd, NewNode("", "", nid))
-			}
-		}
-	}
 
 	// Check to see if a node (not group) BootGroup and BootConfig exist with this
 	// configuration. We will only add a new per-node BootGroup/BootConfig if one
@@ -693,18 +635,18 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 		bc             BootConfig
 		bgaList        []BootGroupAssignment
 	)
-	existingBgList, existingBcList, numResults, err = bddb.GetBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
+	existingBgList, existingBcList, numResults, err = bddb.GetBootConfigsByItems(kernelUri, initrdUri, cmdline)
 	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
+		err = fmt.Errorf("Could not get boot configs by kernel/initrd URI or params: %v", err)
 		return result, err
 	}
 	// Create boot group and boot config with these parameters so we can compare them
 	// with results from the database to see if they already exist.
-	bgName := fmt.Sprintf("BootGroup(kernel=%q,initrd=%q,params=%q)", bp.Kernel, bp.Initrd, bp.Params)
-	bgDesc := fmt.Sprintf("Boot group for nodes with kernel=%q initrd=%q params=%q", bp.Kernel, bp.Initrd, bp.Params)
-	bc, err = NewBootConfig(bp.Kernel, bp.Initrd, bp.Params)
+	bgName := fmt.Sprintf("BootGroup(kernel=%q,initrd=%q,params=%q)", kernelUri, initrdUri, cmdline)
+	bgDesc := fmt.Sprintf("Boot group for nodes with kernel=%q initrd=%q params=%q", kernelUri, initrdUri, cmdline)
+	bc, err = NewBootConfig(kernelUri, initrdUri, cmdline)
 	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
+		err = fmt.Errorf("Could not create BootConfig: %v", err)
 		return result, err
 	}
 	bg = NewBootGroup(bc.Id, bgName, bgDesc)
@@ -728,12 +670,12 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 	// If an existing BootConfig/BootGroup exists for this kernel/initrd/cmdline,
 	// set bg and bc to it and create BootGroupAssignments for these nodes,
 	// assigning them to the existing config.
-	for _, node := range nodesToAdd {
+	for _, node := range nodeList {
 		// Create BootGroupAssignment for node.
 		var bga BootGroupAssignment
 		bga, err = NewBootGroupAssignment(bg.Id, node.Id)
 		if err != nil {
-			err = fmt.Errorf("postgres.Add: %v", err)
+			err = fmt.Errorf("Could not create BootGroupAssignment: %v", err)
 			return result, err
 		}
 		bgaList = append(bgaList, bga)
@@ -745,14 +687,14 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 		// Add new boot configs to boot_configs table.
 		err = bddb.addBootConfigs([]BootConfig{bc})
 		if err != nil {
-			err = fmt.Errorf("postgres.Add: %v", err)
+			err = fmt.Errorf("Could not add BootConfig %v: %v", bc, err)
 			return result, err
 		}
 
 		// Add new boot groups to boot_groups table.
 		err = bddb.addBootGroups([]BootGroup{bg})
 		if err != nil {
-			err = fmt.Errorf("postgres.Add: %v", err)
+			err = fmt.Errorf("Could not add BootGroup %v: %v", bg, err)
 			return result, err
 		}
 
@@ -761,7 +703,7 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 	}
 
 	// Add new nodes to nodes table.
-	err = bddb.addNodes(nodesToAdd)
+	err = bddb.addNodes(nodeList)
 	if err != nil {
 		err = fmt.Errorf("postgres.Add: %v", err)
 		return result, err
@@ -770,7 +712,7 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 	// Add new boot group assignments to boot_group_assignments table.
 	err = bddb.addBootGroupAssignments(bgaList)
 	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
+		err = fmt.Errorf("Could not add BootGroupAssignments %v: %v", bgaList, err)
 		return result, err
 	}
 
@@ -778,39 +720,90 @@ func (bddb BootDataDatabase) addBootConfigByNode(bp bssTypes.BootParams) (map[st
 }
 
 func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]string, err error) {
-	// Check if BootConfig/BootGroup exists.
 	var (
-		//existingBgList []BootGroup
-		//existingBcList []BootConfig
-		//numResults     int
+		groupNames []string
+		xNames     []string
+		reXName    = regexp.MustCompile(`^x([0-9]{1,4})c([0-7])b([0])$`)
 	)
-	//existingBgList, existingBcList, numResults, err = bddb.GetBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
-	_, _, _, err = bddb.GetBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
-	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
-		return result, err
+	for _, name := range bp.Hosts {
+		match := reXName.FindString(name)
+		if match == "" {
+			groupNames = append(groupNames, name)
+		} else {
+			xNames = append(xNames, name)
+		}
 	}
+	if len(groupNames) > 0 {
+		result, err = bddb.addBootConfigByGroup(groupNames, bp.Kernel, bp.Initrd, bp.Params)
+		if err != nil {
+			err = fmt.Errorf("postgres.Add: %v", err)
+			return result, err
+		}
+	} else if len(xNames) > 0 {
+		// Check nodes table for any nodes that having a matching XName, MAC, or NID.
+		existingNodeList, err := bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
+		if err != nil {
+			err = fmt.Errorf("postgres.Add: %v", err)
+			return result, err
+		}
 
-	// First, see if we are adding the config for a boot group that
-	// already exists.
-	//result, err = bddb.addBootConfigByGroup(bp, existingBgList, existingBcList)
-	//if err != nil {
-	//	err = fmt.Errorf("postgres.Add: %v", err)
-	//	return result, err
-	//}
-	// If boot config was added for a boot group, return the result.
-	// Otherwise, we move on to add the config for node(s) if it/they
-	// exist(s).
-	//if len(result) > 0 {
-	//	return result, err
-	//}
+		// Since we are adding nodes, we will skip over existing nodes. It is assumed that existing
+		// nodes already have a BootGroup with a corresponding BootConfig and a BootGroupAssignment.
+		// So, when we add a new node, we will create a BootConfig, a BootGroup for that node, and
+		// a BootGroupAssignment asigning that node to that BootGroup.
 
-	// If the no config was added for a boot group, then we try to
-	// add a new node with the config, if it doesn't already exist.
-	result, err = bddb.addBootConfigByNode(bp)
-	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
-		return result, err
+		// Determine nodes we need to add (ones that don't already exist).
+		//
+		// Nodes can be specified by XName, NID, or MAC address, so we query the list of existing
+		// nodes using all three.
+		var nodesToAdd []Node
+		switch {
+		case len(bp.Macs) > 0:
+			// Make map of existing nodes with MAC address as the key.
+			existingNodeMap := make(map[string]Node)
+			for _, n := range existingNodeList {
+				existingNodeMap[n.BootMac] = n
+			}
+
+			// Store list of nodes to add.
+			for _, mac := range bp.Macs {
+				if existingNodeMap[mac] == (Node{}) {
+					nodesToAdd = append(nodesToAdd, NewNode(mac, "", 0))
+				}
+			}
+		case len(bp.Hosts) > 0:
+			// Make map of existing nodes with Xname as the key.
+			existingNodeMap := make(map[string]Node)
+			for _, n := range existingNodeList {
+				existingNodeMap[n.Xname] = n
+			}
+
+			// Store list of nodes to add.
+			for _, xname := range bp.Hosts {
+				if existingNodeMap[xname] == (Node{}) {
+					nodesToAdd = append(nodesToAdd, NewNode("", xname, 0))
+				}
+			}
+		case len(bp.Nids) > 0:
+			// Make map of existing nodes with Nid as the key.
+			existingNodeMap := make(map[int32]Node)
+			for _, n := range existingNodeList {
+				existingNodeMap[n.Nid] = n
+			}
+
+			// Store list of nodes to add.
+			for _, nid := range bp.Nids {
+				if existingNodeMap[nid] == (Node{}) {
+					nodesToAdd = append(nodesToAdd, NewNode("", "", nid))
+				}
+			}
+		}
+
+		result, err = bddb.addBootConfigByNode(nodesToAdd, bp.Kernel, bp.Initrd, bp.Params)
+		if err != nil {
+			err = fmt.Errorf("postgres.Add: %v", err)
+			return result, err
+		}
 	}
 	return result, err
 }
