@@ -355,27 +355,26 @@ func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline
 
 	qstr := "SELECT bg.id, bg.name, bg.description, bc.id, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM boot_groups AS bg" +
 		" LEFT JOIN boot_configs AS bc" +
-		" ON bg.boot_config_id=bc.id" +
-		" WHERE ("
+		" WHERE bg.boot_group_id=bc.id" +
+		" AND"
 	lengths := []int{len(kernelUri), len(initrdUri), len(cmdline)}
-	for first, qsep, i := true, "", 0; i < len(lengths); i++ {
+	for first, i := true, 0; i < len(lengths); i++ {
 		if lengths[i] > 0 {
 			if !first {
 				qstr += " OR"
-				qsep = " "
 			}
 			switch i {
 			case 0:
-				qstr += qsep + fmt.Sprintf("kernel_uri='%s'", kernelUri)
+				qstr += fmt.Sprintf(" kernel_uri IN %s", kernelUri)
 			case 1:
-				qstr += qsep + fmt.Sprintf("initrd_uri='%s'", initrdUri)
+				qstr += fmt.Sprintf(" initrd_uri IN %s", initrdUri)
 			case 2:
-				qstr += qsep + fmt.Sprintf("cmdline='%s'", cmdline)
+				qstr += fmt.Sprintf(" cmdline IN %s", cmdline)
 			}
 			first = false
 		}
 	}
-	qstr += ");"
+	qstr += ";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
 		err = fmt.Errorf("postgres.GetBootConfigsAll: Unable to query database: %v", err)
