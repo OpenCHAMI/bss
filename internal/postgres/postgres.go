@@ -662,7 +662,7 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 			// We will not add new ones.
 			bc = existingBcList[i]
 			bg = existingBgList[i]
-			addBcAndBg = true
+			addBcAndBg = false
 			break
 		}
 	}
