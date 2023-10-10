@@ -367,7 +367,7 @@ func main() {
 		}
 
 		// Initiate connection to Postgres.
-		log.Printf("sqlInsecure: %v\n!sqlInsecure: %v", sqlInsecure, !sqlInsecure)
+		log.Printf("Using insecure connection to SQL database: %v\n", sqlInsecure)
 		bssdb, err = sqlOpen(sqlHost, sqlPort, sqlUser, sqlPassword, !sqlInsecure, sqlRetryCount, sqlRetryWait)
 		if err != nil {
 			log.Fatalf("Access to Postgres database at %s:%d failed: %v\n", sqlHost, sqlPort, err)
