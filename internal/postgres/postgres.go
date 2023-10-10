@@ -305,7 +305,7 @@ func (bddb BootDataDatabase) GetBootConfigsAll() ([]BootGroup, []BootConfig, int
 
 	qstr := "SELECT bg.id, bg.name, bg.description, bc.id, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM boot_groups AS bg" +
 		" LEFT JOIN boot_configs AS bc" +
-		" WHERE bg.boot_group_id=bc.id" +
+		" ON bg.boot_config_id=bc.id" +
 		";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
@@ -355,8 +355,8 @@ func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline
 
 	qstr := "SELECT bg.id, bg.name, bg.description, bc.id, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM boot_groups AS bg" +
 		" LEFT JOIN boot_configs AS bc" +
-		" WHERE bg.boot_group_id=bc.id" +
-		" AND"
+		" ON bg.boot_config_id=bc.id" +
+		" WHERE"
 	lengths := []int{len(kernelUri), len(initrdUri), len(cmdline)}
 	for first, i := true, 0; i < len(lengths); i++ {
 		if lengths[i] > 0 {
@@ -365,11 +365,11 @@ func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline
 			}
 			switch i {
 			case 0:
-				qstr += fmt.Sprintf(" kernel_uri IN %s", kernelUri)
+				qstr += fmt.Sprintf(" kernel_uri='%s'", kernelUri)
 			case 1:
-				qstr += fmt.Sprintf(" initrd_uri IN %s", initrdUri)
+				qstr += fmt.Sprintf(" initrd_uri='%s'", initrdUri)
 			case 2:
-				qstr += fmt.Sprintf(" cmdline IN %s", cmdline)
+				qstr += fmt.Sprintf(" cmdline='%s'", cmdline)
 			}
 			first = false
 		}
