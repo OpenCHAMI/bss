@@ -298,6 +298,10 @@ func (bddb BootDataDatabase) GetNodesByItems(macs, xnames []string, nids []int32
 	return nodeList, err
 }
 
+// GetBootConfigsAll returns a slice of all BootGroups and a slice of all BootConfigs in the
+// database, as well as the number of items in these slices (each BootGroup corresponds to a
+// BootConfig, so these slices have the same number of items). If an error occurs with the query or
+// scanning of the query results, an error is returned.
 func (bddb BootDataDatabase) GetBootConfigsAll() ([]BootGroup, []BootConfig, int, error) {
 	bgResults := []BootGroup{}
 	bcResults := []BootConfig{}
@@ -343,6 +347,10 @@ func (bddb BootDataDatabase) GetBootConfigsAll() ([]BootGroup, []BootConfig, int
 	return bgResults, bcResults, numResults, err
 }
 
+// GetBootConfigsByItems returns a slice of BootGroups and a slice of BootConfigs that match the
+// passed kernel URI, initrd URI, and parameters, as well as the number of results that were
+// returned (each BootGroup corresponds to a BootConfig, so these slices have the same number of
+// items). If an error occurs with the query or scanning of the query results, an error is returned.
 func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline string) ([]BootGroup, []BootConfig, int, error) {
 	// If no items are specified, get all boot configs, mapped by boot group.
 	if kernelUri == "" && initrdUri == "" && cmdline == "" {
@@ -462,10 +470,15 @@ func getMatches(a, b []string) (matches, exclusions []string) {
 	return matches, exclusions
 }
 
+// Close calls the Close() method on the database object within the BootDataDatabase. If it errs, an
+// error is returned.
 func (bddb BootDataDatabase) Close() error {
 	return bddb.DB.Close()
 }
 
+// CreateDB executes an SQL query to create the BSS database with the specified name (if it doesn't
+// already exist) and creates the tables needed by BSS if they do not exist. If this query fails, an
+// error is returned.
 func (bddb BootDataDatabase) CreateDB(name string) (err error) {
 	// Create the database.
 	//
@@ -719,12 +732,19 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 	return result, err
 }
 
+// Add takes a bssTypes.BootParams and adds nodes and their boot configuration to the database. If a
+// node or its configuration already exists, it is ignored. If one or more nodes are specified and a
+// configuration exists that does not belong to an existing node group, that config is used for
+// that/those node(s). One or more nodes can be specified by _either_ their XNames, boot MAC
+// addresses, or NIDs. One or more node group names can be specified instead of XNames, but this is
+// currently not supported by Add.
 func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]string, err error) {
 	var (
 		groupNames []string
 		xNames     []string
 		reXName    = regexp.MustCompile(`^x([0-9]{1,4})c([0-7])(s([0-9]{1,4}))?b([0])(n([0-9]{1,4}))?$`)
 	)
+	// Check each host to see if it is an XName or a node group name.
 	for _, name := range bp.Hosts {
 		match := reXName.FindString(name)
 		if match == "" {
@@ -733,13 +753,18 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 			xNames = append(xNames, name)
 		}
 	}
+	// The BSS API only supports adding a boot config for _either_ a node group or a set
+	// of nodes. Thus, we do either or here.
 	if len(groupNames) > 0 {
+		// Group name(s) specified, add boot config by group.
 		result, err = bddb.addBootConfigByGroup(groupNames, bp.Kernel, bp.Initrd, bp.Params)
 		if err != nil {
 			err = fmt.Errorf("postgres.Add: %v", err)
 			return result, err
 		}
 	} else if len(xNames) > 0 {
+		// XName(s) specified, add boot config by node(s).
+
 		// Check nodes table for any nodes that having a matching XName, MAC, or NID.
 		existingNodeList, err := bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
 		if err != nil {
@@ -747,10 +772,11 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 			return result, err
 		}
 
-		// Since we are adding nodes, we will skip over existing nodes. It is assumed that existing
+		// Since we are _adding_ nodes, we will skip over existing nodes. It is assumed that existing
 		// nodes already have a BootGroup with a corresponding BootConfig and a BootGroupAssignment.
-		// So, when we add a new node, we will create a BootConfig, a BootGroup for that node, and
-		// a BootGroupAssignment asigning that node to that BootGroup.
+		// So, when we add a new node, we will create a BootConfig and BootGroup for that node (if one
+		// that does not belong to a node group and that has the same configuration does not already
+		// exist), as well as a BootGroupAssignment asigning that node to that BootGroup.
 
 		// Determine nodes we need to add (ones that don't already exist).
 		//
@@ -799,6 +825,7 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 			}
 		}
 
+		// Add any nonexisting nodes, plus their boot config as needed.
 		result, err = bddb.addBootConfigByNode(nodesToAdd, bp.Kernel, bp.Initrd, bp.Params)
 		if err != nil {
 			err = fmt.Errorf("postgres.Add: %v", err)
@@ -808,6 +835,11 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 	return result, err
 }
 
+// GetBootParamsAll returns a slice of bssTypes.BootParams that contains all of the boot
+// configurations for all nodes in the database. Each item contains node information (boot MAC
+// address (if present), XName (if present), NID (if present)) as well as its associated boot
+// configuration (kernel URI, initrd URI (if present), and parameters). If an error occurred while
+// fetching the information, an error is returned.
 func (bddb BootDataDatabase) GetBootParamsAll() ([]bssTypes.BootParams, error) {
 	var results []bssTypes.BootParams
 
@@ -876,6 +908,11 @@ func (bddb BootDataDatabase) GetBootParamsAll() ([]bssTypes.BootParams, error) {
 	return results, err
 }
 
+// GetBootParamsByName returns a slice of bssTypes.BootParams that contains the boot configurations
+// for nodes whose XNames are found in the passed slice of names. Each item contains node
+// information (boot MAC address (if present), XName (if present), NID (if present)) as well as its
+// associated boot configuration (kernel URI, initrd URI (if present), and parameters). If an error
+// occurred while fetching the information, an error is returned.
 func (bddb BootDataDatabase) GetBootParamsByName(names []string) ([]bssTypes.BootParams, error) {
 	var results []bssTypes.BootParams
 
@@ -923,6 +960,11 @@ func (bddb BootDataDatabase) GetBootParamsByName(names []string) ([]bssTypes.Boo
 	return results, err
 }
 
+// GetBootParamsByMac returns a slice of bssTypes.BootParams that contains the boot configurations
+// for nodes whose boot MAC addresses are found in the passed slice of MAC addresses. Each item
+// contains node information (boot MAC address (if present), XName (if present), NID (if present))
+// as well as its associated boot configuration (kernel URI, initrd URI (if present), and
+// parameters). If an error occurred while fetching the information, an error is returned.
 func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootParams, error) {
 	var results []bssTypes.BootParams
 
@@ -970,6 +1012,11 @@ func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootP
 	return results, err
 }
 
+// GetBootParamsByNid returns a slice of bssTypes.BootParams that contains the boot configurations
+// for nodes whose NIDs are found in the passed slice of NIDs. Each item contains node information
+// (boot MAC address (if present), XName (if present), NID (if present)) as well as its associated
+// boot configuration (kernel URI, initrd URI (if present), and parameters). If an error occurred
+// while fetching the information, an error is returned.
 func (bddb BootDataDatabase) GetBootParamsByNid(nids []int32) ([]bssTypes.BootParams, error) {
 	var results []bssTypes.BootParams
 
