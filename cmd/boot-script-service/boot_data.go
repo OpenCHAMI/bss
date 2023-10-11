@@ -238,6 +238,19 @@ func nidName(nid int) string {
 func Remove(bp bssTypes.BootParams) error {
 	debugf("Remove(): Ready to remove %v\n", bp)
 	var err error
+	if useSQL {
+		var (
+			nodesDeleted []string
+			bcsDeleted   []string
+		)
+		nodesDeleted, bcsDeleted, err = bssdb.Delete(bp)
+		if err != nil {
+			return err
+		}
+		debugf("Node IDs deleted: %v", nodesDeleted)
+		debugf("Boot Config IDs deleted: %v", bcsDeleted)
+		return err
+	}
 	for _, h := range bp.Hosts {
 		e := removeHost(h)
 		if err == nil {

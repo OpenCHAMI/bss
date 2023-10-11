@@ -12,7 +12,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const dbName = "bssdb"
+const (
+	dbName     = "bssdb"
+	xNameRegex = `^x([0-9]{1,4})c([0-7])(s([0-9]{1,4}))?b([0])(n([0-9]{1,4}))?$`
+)
 
 type Node struct {
 	Id      string `json:"id"`
@@ -292,6 +295,46 @@ func (bddb BootDataDatabase) GetNodesByItems(macs, xnames []string, nids []int32
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
 		err = fmt.Errorf("Could not parse query results: %v", err)
+		return nodeList, err
+	}
+
+	return nodeList, err
+}
+
+// GetNodesByBootGroupId returns a slice of Nodes that are a member of the BootGroup with an ID of
+// bgId. If an error occurs during the query or scanning, an error is returned.
+func (bddb BootDataDatabase) GetNodesByBootGroupId(bgId string) ([]Node, error) {
+	nodeList := []Node{}
+
+	// If no boot group ID is specified, get all nodes.
+	if bgId == "" {
+		return bddb.GetNodes()
+	}
+
+	qstr := `SELECT n.id, n.boot_mac, n.xname, n.nid FROM nodes AS n` +
+		` LEFT JOIN boot_group_assignments AS bga ON n.id=bga.node_id` +
+		fmt.Sprintf(` WHERE bga.boot_group_id='%s';`, bgId)
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("postgres.GetNodesByBootGroupId: Unable to query database: %v", err)
+		return nodeList, err
+	}
+
+	// rows.Next() returns false if either there is no next result (i.e. it
+	// doesn't exist) or an error occurred. We return rows.Err() to
+	// distinguish between the two cases.
+	for rows.Next() {
+		var n Node
+		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
+		if err != nil {
+			err = fmt.Errorf("postgres.GetNodesByBootGroupId: Could not scan SQL result: %v", err)
+			return nodeList, err
+		}
+		nodeList = append(nodeList, n)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("postgres.GetNodesByBootGroupId: Could not parse query results: %v", err)
 		return nodeList, err
 	}
 
@@ -732,6 +775,391 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 	return result, err
 }
 
+func (bddb BootDataDatabase) deleteBootConfigByGroup(groupNames []string) ([]Node, []BootConfig, error) {
+	var (
+		nodeList []Node
+		bcList   []BootConfig
+	)
+	if len(groupNames) == 0 {
+		return nodeList, bcList, fmt.Errorf("No group names specified for deletion.")
+	}
+	qstr := fmt.Sprintf(`DELETE FROM boot_groups WHERE name IN %s`, stringSliceToSql(groupNames)) +
+		`RETURNING *;`
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot group deletion in database: %v", err)
+		return nodeList, bcList, err
+	}
+	defer rows.Close()
+
+	var (
+		bgIdList []string
+		bcIdList []string
+	)
+	for rows.Next() {
+		var bg BootGroup
+		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootGroup: %v", err)
+			return nodeList, bcList, err
+		}
+		bgIdList = append(bgIdList, bg.Id)
+		bcIdList = append(bcIdList, bg.BootConfigId)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	qstr = fmt.Sprintf(`DELETE FROM boot_configs WHERE id IN %s`, stringSliceToSql(bcIdList)) +
+		` RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot config deletion: %v", err)
+		return nodeList, bcList, err
+	}
+	for rows.Next() {
+		var bc BootConfig
+		err = rows.Scan(&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootConfig: %v", err)
+			return nodeList, bcList, err
+		}
+		bcList = append(bcList, bc)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	qstr = fmt.Sprintf(`DELETE FROM boot_group_assignments WHERE boot_group_id IN %s`, stringSliceToSql(bgIdList)) +
+		`RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot group assignment deletion: %v", err)
+		return nodeList, bcList, err
+	}
+	var nodeIdList []string
+	for rows.Next() {
+		var bga BootGroupAssignment
+		err = rows.Scan(&bga.BootGroupId, &bga.NodeId)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootGroupAssignment: %v", err)
+			return nodeList, bcList, err
+		}
+		nodeIdList = append(nodeIdList, bga.NodeId)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	qstr = fmt.Sprintf(`DELETE FROM nodes WHERE id IN %s`, stringSliceToSql(nodeIdList)) +
+		` RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform node deletion in database: %v", err)
+		return nodeList, bcList, err
+	}
+	for rows.Next() {
+		var n Node
+		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into Node: %v", err)
+			return nodeList, bcList, err
+		}
+		nodeList = append(nodeList, n)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+
+	return nodeList, bcList, err
+}
+
+func (bddb BootDataDatabase) deleteXnamesWithBootConfigs(hosts, macs []string, nids []int32) ([]Node, []BootConfig, error) {
+	var (
+		nodeList []Node
+		bcList   []BootConfig
+	)
+	qstr := `DELETE FROM nodes WHERE`
+	lengths := []int{len(hosts), len(macs), len(nids)}
+	for first, i := true, 0; i < len(lengths); i++ {
+		if lengths[i] > 0 {
+			if !first {
+				qstr += ` OR`
+			}
+			switch i {
+			case 0:
+				qstr += fmt.Sprintf(` xname IN %s`, stringSliceToSql(hosts))
+			case 1:
+				qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macs))
+			case 2:
+				qstr += fmt.Sprintf(` nid IN %s`, int32SliceToSql(nids))
+			}
+			first = false
+		}
+	}
+	qstr += `RETURNING *;`
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform node deletion in database: %v", err)
+		return nodeList, bcList, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var n Node
+		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into Node: %v", err)
+			return nodeList, bcList, err
+		}
+		nodeList = append(nodeList, n)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	// Get node IDs.
+	var nodeIdList []string
+	for _, node := range nodeList {
+		nodeIdList = append(nodeIdList, node.Id)
+	}
+
+	// Delete boot group assignments for nodes.
+	qstr = fmt.Sprintf(`DELETE FROM boot_group_assignments WHERE node_id IN %s`, stringSliceToSql(nodeIdList)) +
+		` RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot group assignment deletion: %v", err)
+		return nodeList, bcList, err
+	}
+	bgIdMap := make(map[string]string)
+	for rows.Next() {
+		var bga BootGroupAssignment
+		err = rows.Scan(&bga.BootGroupId, &bga.NodeId)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootGroupAssignment: %v", err)
+			return nodeList, bcList, err
+		}
+		if bgIdMap[bga.BootGroupId] == "" {
+			bgIdMap[bga.BootGroupId] = bga.BootGroupId
+		}
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	// Delete boot groups that were attached to the deleted nodes, but only those that don't
+	// have any undeleted nodes attached to them.
+	var uniqueBgIdList []string
+	for _, bgId := range bgIdMap {
+		nl, err := bddb.GetNodesByBootGroupId(bgId)
+		if err != nil {
+			err = fmt.Errorf("Could not get nodes by boot group ID: %v", err)
+			return nodeList, bcList, err
+		}
+		if len(nl) == 0 {
+			uniqueBgIdList = append(uniqueBgIdList, bgId)
+		}
+	}
+	qstr = fmt.Sprintf(`DELETE FROM boot_groups WHERE id IN %s`, stringSliceToSql(uniqueBgIdList)) +
+		` RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot group deletion in database: %v", err)
+		return nodeList, bcList, err
+	}
+	var bgList []BootGroup
+	for rows.Next() {
+		var bg BootGroup
+		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootGroup: %v", err)
+			return nodeList, bcList, err
+		}
+		bgList = append(bgList, bg)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	var bgIdList []string
+	for _, bg := range bgList {
+		bgIdList = append(bgIdList, bg.BootConfigId)
+	}
+	qstr = fmt.Sprintf(`DELETE FROM boot_configs WHERE id IN %s`, stringSliceToSql(bgIdList)) +
+		` RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot config deletion: %v", err)
+		return nodeList, bcList, err
+	}
+	for rows.Next() {
+		var bc BootConfig
+		err = rows.Scan(&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootConfig: %v", err)
+			return nodeList, bcList, err
+		}
+		bcList = append(bcList, bc)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+
+	return nodeList, bcList, err
+}
+
+// deleteBootConfigs deletes boot configs with matching kernel URI, initrd URI, and params and
+// deletes the nodes that are attached to them from the database. It returns a slice of deleted
+// Nodes and a slice of deleted BootConfigs. If an error occurs with any of the queries, it is
+// returned.
+func (bddb BootDataDatabase) deleteBootConfigs(kernelUri, initrdUri, cmdline string) ([]Node, []BootConfig, error) {
+	var (
+		bcList   []BootConfig
+		nodeList []Node
+	)
+
+	qstr := `DELETE FROM boot_configs WHERE`
+	strs := []string{kernelUri, initrdUri, cmdline}
+	for first, i := true, 0; i < len(strs); i++ {
+		if strs[i] != "" {
+			if !first {
+				qstr += ` AND`
+			}
+			switch i {
+			case 0:
+				qstr += fmt.Sprintf(` kernel_uri='%s'`, kernelUri)
+			case 1:
+				qstr += fmt.Sprintf(` initrd_uri='%s'`, initrdUri)
+			case 2:
+				qstr += fmt.Sprintf(` cmdline='%s'`, cmdline)
+			}
+			first = false
+		}
+	}
+	qstr += ` RETURNING *;`
+	rows, err := bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot config deletion in database: %v", err)
+		return nodeList, bcList, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var bc BootConfig
+		err = rows.Scan(&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootConfig: %v", err)
+			return nodeList, bcList, err
+		}
+		bcList = append(bcList, bc)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	var bcIdList []string
+	for _, bc := range bcList {
+		bcIdList = append(bcIdList, bc.Id)
+	}
+	qstr = fmt.Sprintf(`DELETE FROM boot_groups WHERE boot_config_id IN %s`, stringSliceToSql(bcIdList)) +
+		` RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot group deletion: %v", err)
+		return nodeList, bcList, err
+	}
+	var bgIdList []string
+	for rows.Next() {
+		var bg BootGroup
+		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootConfig: %v", err)
+			return nodeList, bcList, err
+		}
+		bgIdList = append(bgIdList, bg.Id)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	qstr = fmt.Sprintf(`DELETE FROM boot_group_assignments WHERE boot_group_id IN %s`, stringSliceToSql(bgIdList)) +
+		` RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform boot group assignment deletion: %v", err)
+		return nodeList, bcList, err
+	}
+	var nodeIdList []string
+	for rows.Next() {
+		var bga BootGroupAssignment
+		err = rows.Scan(&bga.BootGroupId, &bga.NodeId)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into BootGroupAssignment: %v", err)
+			return nodeList, bcList, err
+		}
+		nodeIdList = append(nodeIdList, bga.NodeId)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+	rows.Close()
+
+	qstr = fmt.Sprintf(`DELETE FROM nodes WHERE id IN %s`, stringSliceToSql(nodeIdList)) +
+		`RETURNING *;`
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not perform node deletion: %v", err)
+		return nodeList, bcList, err
+	}
+	for rows.Next() {
+		var n Node
+		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
+		if err != nil {
+			err = fmt.Errorf("Could not scan deletion results into Node: %v", err)
+			return nodeList, bcList, err
+		}
+		nodeList = append(nodeList, n)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		return nodeList, bcList, err
+	}
+
+	return nodeList, bcList, err
+}
+
 // Add takes a bssTypes.BootParams and adds nodes and their boot configuration to the database. If a
 // node or its configuration already exists, it is ignored. If one or more nodes are specified and a
 // configuration exists that does not belong to an existing node group, that config is used for
@@ -742,7 +1170,7 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 	var (
 		groupNames []string
 		xNames     []string
-		reXName    = regexp.MustCompile(`^x([0-9]{1,4})c([0-7])(s([0-9]{1,4}))?b([0])(n([0-9]{1,4}))?$`)
+		reXName    = regexp.MustCompile(xNameRegex)
 	)
 	// Check each host to see if it is an XName or a node group name.
 	for _, name := range bp.Hosts {
@@ -833,6 +1261,89 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 		}
 	}
 	return result, err
+}
+
+// Delete removes one or more nodes (and the corresponding BootGroupAssignment(s)) from the
+// database, as well as the corresponding BootGroup/BootConfig if no other node uses the same boot
+// config. If kernel URI, initrd URI, and params are specified, Delete will also remove any boot
+// config (and matching boot group) matching them. A list of node IDs and a map of boot group IDs to
+// boot config IDs that were deleted are returned. If an error occurs with the deletion, it is
+// returned.
+func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDeleted []string, err error) {
+	// Delete nodes/boot configs by specifying one or more nodes. Leave boot configs that are
+	// attached to nodes that won't be deleted.
+	switch {
+	case len(bp.Hosts) > 0:
+		var (
+			groupNames []string
+			xNames     []string
+			reXName    = regexp.MustCompile(xNameRegex)
+		)
+		// Check each host to see if it is an XName or a node group name.
+		for _, name := range bp.Hosts {
+			match := reXName.FindString(name)
+			if match == "" {
+				groupNames = append(groupNames, name)
+			} else {
+				xNames = append(xNames, name)
+			}
+		}
+		// The BSS API only supports adding a boot config for _either_ a node group or a set
+		// of nodes. Thus, we do either or here.
+		var (
+			delNodes []Node
+			delBcs   []BootConfig
+		)
+		if len(groupNames) > 0 {
+			// Group name(s) specified, add boot config by group.
+			delNodes, delBcs, err = bddb.deleteBootConfigByGroup(groupNames)
+			if err != nil {
+				err = fmt.Errorf("postgres.Add: %v", err)
+				return nodesDeleted, bcsDeleted, err
+			}
+		} else if len(xNames) > 0 {
+			// XName(s) specified, delete node(s) and relative boot configs.
+			delNodes, delBcs, err = bddb.deleteXnamesWithBootConfigs(xNames, bp.Macs, bp.Nids)
+			if err != nil {
+				err = fmt.Errorf("postgres.Delete: %v", err)
+				return nodesDeleted, bcsDeleted, err
+			}
+		}
+
+		for _, node := range delNodes {
+			nodesDeleted = append(nodesDeleted, node.Id)
+		}
+		for _, bc := range delBcs {
+			bcsDeleted = append(bcsDeleted, bc.Id)
+		}
+	case len(bp.Macs) > 0:
+	case len(bp.Nids) > 0:
+	}
+
+	// Delete nodes/boot configs by specifying the boot configuration.
+	if bp.Kernel != "" || bp.Initrd != "" || bp.Params != "" {
+		var (
+			delConfigNodes []Node
+			delConfigs     []BootConfig
+		)
+		delConfigNodes, delConfigs, err = bddb.deleteBootConfigs(bp.Kernel, bp.Initrd, bp.Params)
+		if err != nil {
+			err = fmt.Errorf("postgres.Delete: %v", err)
+			return nodesDeleted, bcsDeleted, err
+		}
+		for _, node := range delConfigNodes {
+			nodesDeleted = append(nodesDeleted, node.Id)
+		}
+		for _, bc := range delConfigs {
+			bcsDeleted = append(bcsDeleted, bc.Id)
+		}
+	}
+
+	return nodesDeleted, bcsDeleted, err
+}
+
+func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (err error) {
+	return nil
 }
 
 // GetBootParamsAll returns a slice of bssTypes.BootParams that contains all of the boot
