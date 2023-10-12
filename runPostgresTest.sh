@@ -70,7 +70,7 @@ if [ "${nocache}" = true ]; then
 else
 	docker-compose build
 fi
-docker-compose up --exit-code-from hms-bss-test hms-bss-test
+docker-compose up --exit-code-from bss-test bss-test
 
 test_result=$?
 

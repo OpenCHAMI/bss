@@ -56,7 +56,7 @@ EXPOSE 27778
 STOPSIGNAL SIGTERM
 
 # Setup environment variables.
-ENV HSM_URL=http://cray-smd
+ENV HSM_URL=http://smd:27779
 ENV NFD_URL=http://cray-hmnfd
 
 # WARNING: Our containers currently do not have certificates set up correctly
@@ -88,4 +88,4 @@ COPY .version /
 USER 65534:65534
 
 # Set up the command to start the service, the run the init script.
-CMD boot-script-service $BSS_OPTS --cloud-init-address localhost --hsm=$HSM_URL --postgres --postgres-host $POSTGRES_HOST --postgres-port $POSTGRES_PORT --retry-delay=$BSS_RETRY_DELAY --hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
+CMD boot-script-service $BSS_OPTS --cloud-init-address localhost --hsm=$HSM_URL --postgres --postgres-host $POSTGRES_HOST --postgres-port $POSTGRES_PORT --retry-delay=$BSS_RETRY_DELAY --hsm $HSM_URL --hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
