@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+
+#
 # MIT License
 #
 # (C) Copyright [2020-2022] Hewlett Packard Enterprise Development LP
@@ -19,21 +22,64 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+#
+usage() {
+	echo "Usage: $0 [-hn]"
+	echo " -h Print this help message."
+	echo " -n Pass --no-cache to docker-compose build."
+}
 
-FROM artifactory.algol60.net/csm-docker/stable/hms-test:5.0.0
+nocache=false
+while getopts 'hn' opt; do
+	case "${opt}" in
+		h)
+			usage
+			;;
+		n)
+			nocache=true
+			;;
+		*)
+			usage >&2
+			;;
+	esac
+done
 
-COPY smoke/ /src/app
-COPY api/ /src/app/api
-COPY tavern_global_config_ct_test.yaml /src/app/tavern_global_config_ct_test.yaml
-COPY bss_test_utils.py /src/libs/bss_test_utils.py
+set -x
 
-ENV PATH="/src/libs:${PATH}"
-ENV PATH="/src/app:${PATH}"
-ENV PYTHONPATH=$PYTHONPATH:/src/libs 
+# Configure docker compose
+export COMPOSE_PROJECT_NAME=$RANDOM
+export COMPOSE_FILE=docker-compose.test.postgres.yaml
 
-USER root
-RUN chown -R 65534:65534 /src
-USER 65534:65534
+echo "COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME}"
+echo "COMPOSE_FILE: ${COMPOSE_FILE}"
 
-# this is inherited from the hms-test container
-ENTRYPOINT [ "entrypoint.sh" ]
+
+function cleanup() {
+  docker-compose down
+  if ! [[ $? -eq 0 ]]; then
+    echo "Failed to decompose environment!"
+    exit 1
+  fi
+  exit $1
+}
+
+
+echo "Starting containers..."
+if [ "${nocache}" = true ]; then
+	docker-compose build --no-cache
+else
+	docker-compose build
+fi
+docker-compose up --exit-code-from bss-test bss-test
+
+test_result=$?
+
+# Clean up
+echo "Cleaning up containers..."
+if [[ $test_result -ne 0 ]]; then
+  echo "Unit tests FAILED!"
+  cleanup 1
+fi
+
+echo "Unit tests PASSED!"
+cleanup 0

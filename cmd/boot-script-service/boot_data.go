@@ -238,6 +238,19 @@ func nidName(nid int) string {
 func Remove(bp bssTypes.BootParams) error {
 	debugf("Remove(): Ready to remove %v\n", bp)
 	var err error
+	if useSQL {
+		var (
+			nodesDeleted []string
+			bcsDeleted   []string
+		)
+		nodesDeleted, bcsDeleted, err = bssdb.Delete(bp)
+		if err != nil {
+			return err
+		}
+		debugf("Node IDs deleted: %v", nodesDeleted)
+		debugf("Boot Config IDs deleted: %v", bcsDeleted)
+		return err
+	}
 	for _, h := range bp.Hosts {
 		e := removeHost(h)
 		if err == nil {
@@ -340,6 +353,12 @@ func extractParamName(x hmetcd.Kvi_KV) (ret string) {
 }
 
 func StoreNew(bp bssTypes.BootParams) (error, string) {
+	// postgres.Add will handle duplicates, and it is called in New().
+	// Therefore, if Postgres is enabled, simply call Store().
+	if useSQL {
+		return Store(bp)
+	}
+
 	item := ""
 	// Go through the entire struct.  We must be storing to new hosts or this
 	// request must fail.
@@ -392,6 +411,16 @@ func StoreNew(bp bssTypes.BootParams) (error, string) {
 
 func Store(bp bssTypes.BootParams) (error, string) {
 	debugf("Store(%v)\n", bp)
+
+	if useSQL {
+		debugf("postgres.Add(%v)\n", bp)
+		result, err := bssdb.Add(bp)
+		if err != nil {
+			return err, ""
+		}
+		debugf("postgres.Add result: %v\n", result)
+		return err, uuid.New().String()
+	}
 
 	var kernel_id, initrd_id string
 	if bp.Kernel != "" {
@@ -925,6 +954,27 @@ func LookupByName(name string) (BootData, SMComponent) {
 		comp_name = comp.ID
 		role = comp.Role
 	}
+	if useSQL {
+		var result BootData
+		bps, err := bssdb.GetBootParamsByName([]string{name})
+		if err != nil {
+			err = fmt.Errorf("Could not retrieve boot parameters with name %q: %v", name, err)
+			log.Printf("ERROR: %v", err)
+			return result, comp
+		}
+		if len(bps) == 0 {
+			// Not found.
+			log.Printf("WARNING: Name %q did not return any results.", name)
+			return result, comp
+		} else if len(bps) > 1 {
+			debugf("BootParams returned: %v", bps)
+			log.Printf("WARNING: More than 1 node found for name %q, taking first one: %v", name, bps[0])
+		}
+		result.Kernel = ImageData{bps[0].Kernel, ""}
+		result.Initrd = ImageData{bps[0].Initrd, ""}
+		result.Params = bps[0].Params
+		return result, comp
+	}
 	return lookup(comp_name, name, role, DefaultTag), comp
 }
 
@@ -935,6 +985,27 @@ func LookupByMAC(mac string) (BootData, SMComponent) {
 	if ok {
 		comp_name = comp.ID
 		role = comp.Role
+	}
+	if useSQL {
+		var result BootData
+		bps, err := bssdb.GetBootParamsByMac([]string{mac})
+		if err != nil {
+			err = fmt.Errorf("Could not retrieve boot parameters with mac %q: %v", mac, err)
+			log.Printf("ERROR: %v", err)
+			return result, comp
+		}
+		if len(bps) == 0 {
+			// Not found.
+			log.Printf("WARNING: MAC %q did not return any results.", mac)
+			return result, comp
+		} else if len(bps) > 1 {
+			debugf("BootParams returned: %v", bps)
+			log.Printf("WARNING: More than 1 node found for MAC %q, taking first one: %v", mac, bps[0])
+		}
+		result.Kernel = ImageData{bps[0].Kernel, ""}
+		result.Initrd = ImageData{bps[0].Initrd, ""}
+		result.Params = bps[0].Params
+		return result, comp
 	}
 	return lookup(comp_name, mac, role, DefaultTag), comp
 }
@@ -947,6 +1018,27 @@ func LookupByNid(nid int) (BootData, SMComponent) {
 	if ok {
 		comp_name = comp.ID
 		role = comp.Role
+	}
+	if useSQL {
+		var result BootData
+		bps, err := bssdb.GetBootParamsByNid([]int32{int32(nid)})
+		if err != nil {
+			err = fmt.Errorf("Could not retrieve boot parameters with NID %d: %v", nid, err)
+			log.Printf("ERROR: %v", err)
+			return result, comp
+		}
+		if len(bps) == 0 {
+			// Not found.
+			log.Printf("WARNING: NID %d did not return any results.", nid)
+			return result, comp
+		} else if len(bps) > 1 {
+			debugf("BootParams returned: %v", bps)
+			log.Printf("WARNING: More than 1 node found for NID %d, taking first one: %v", nid, bps[0])
+		}
+		result.Kernel = ImageData{bps[0].Kernel, ""}
+		result.Initrd = ImageData{bps[0].Initrd, ""}
+		result.Params = bps[0].Params
+		return result, comp
 	}
 	return lookup(comp_name, nid_str, role, DefaultTag), comp
 }

@@ -49,15 +49,22 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
+	"github.com/Cray-HPE/hms-bss/internal/postgres"
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
 )
 
 const kvDefaultRetryCount uint64 = 10
 const kvDefaultRetryWait uint64 = 5
+const sqlDefaultRetryCount uint64 = 10
+const sqlDefaultRetryWait uint64 = 5
 
 var (
 	httpListen    = ":27778"
-	datastoreBase = ""
+	datastoreBase = "" // If using ETCD
+	sqlHost       = "localhost"
+	sqlPort       = uint(5432)
+	bssdb         postgres.BootDataDatabase
+	bssdbName     = "bssdb"
 	hsmBase       = "http://localhost:27779"
 	nfdBase       = "http://localhost:28600"
 	serviceName   = "boot-script-service"
@@ -71,11 +78,13 @@ var (
 	// this well known IP.
 	advertiseAddress  = "" // i.e. http://{IP to reach this service}
 	insecure          = false
+	sqlInsecure       = false
 	debugFlag         = true
 	kvstore           hmetcd.Kvi
 	retryDelay        = uint(30)
 	hsmRetrievalDelay = uint(10)
 	notifier          *ScnNotifier
+	useSQL            = false // Use ETCD by default
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
@@ -154,6 +163,33 @@ func kvDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
 	return retryCount, retryWait, nil
 }
 
+// Try to read SQL_RETRY_COUNT and SQL_RETRY_WAIT environment variables.
+// If either variable contains an invalid value, return the default values of both.
+func sqlDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
+	retryCount = sqlDefaultRetryCount
+	retryWait = sqlDefaultRetryWait
+
+	envRetryCount := os.Getenv("SQL_RETRY_COUNT")
+	if envRetryCount != "" {
+		retryCount, err = strconv.ParseUint(envRetryCount, 10, 64)
+		if err != nil {
+			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_COUNT environment variable: ", err)
+			return kvDefaultRetryCount, kvDefaultRetryWait, err
+		}
+	}
+
+	envRetryWait := os.Getenv("SQL_RETRY_WAIT")
+	if envRetryWait != "" {
+		retryWait, err = strconv.ParseUint(envRetryWait, 10, 64)
+		if err != nil {
+			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_WAIT environment variable: ", err)
+			return kvDefaultRetryWait, kvDefaultRetryWait, err
+		}
+	}
+
+	return retryCount, retryWait, nil
+}
+
 func kvOpen(url, opts string, retryCount, retryWait uint64) (err error) {
 	ix := uint64(1)
 	for ; ix <= retryCount; ix++ {
@@ -173,6 +209,56 @@ func kvOpen(url, opts string, retryCount, retryWait uint64) (err error) {
 		log.Printf("KV service initialized connecting to %s", url)
 	}
 	return err
+}
+
+func sqlGetCreds() (user, password string, err error) {
+	err = nil
+	user = os.Getenv("SQL_USER")
+	if user == "" {
+		err = fmt.Errorf("ERROR: unable to get SQL_USER environment variable.")
+		return "", "", err
+	}
+
+	password = os.Getenv("SQL_PASSWORD")
+	if password == "" {
+		err = fmt.Errorf("ERROR: unable to get SQL_PASSWORD environment variable.")
+		return "", "", err
+	}
+
+	return user, password, err
+}
+
+func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount, retryWait uint64) (postgres.BootDataDatabase, error) {
+	var (
+		err error
+		bddb postgres.BootDataDatabase
+	)
+	ix := uint64(1)
+
+	for ; ix <= retryCount; ix++ {
+		log.Printf("Attempting connection to Postgres (attempt %d)", ix)
+		bddb, err = postgres.Connect(host, port, user, password, ssl)
+		if err != nil {
+			log.Printf("ERROR opening opening connection to Postgres (attempt %d): %v\n", ix, err)
+		} else {
+			break
+		}
+
+		time.Sleep(time.Duration(retryWait) * time.Second)
+	}
+	if ix > retryCount {
+		err = fmt.Errorf("Postgres connection attempts exhausted (%d).", retryCount)
+	} else {
+		log.Printf("Initialized connection to Postgres database at %s:%d", host, port)
+	}
+	return bddb, err
+}
+
+func sqlClose() {
+	err := bssdb.Close()
+	if err != nil {
+		log.Fatalf("Error attempting tp close connection to Postgres: %v", err)
+	}
 }
 
 func getNotifierURL() string {
@@ -227,13 +313,17 @@ func main() {
 	flag.StringVar(&hsmBase, "hsm", hsmBase, "Hardware State Manager location as URI, e.g. [scheme]://[host[:port]]")
 	flag.StringVar(&nfdBase, "nfd", nfdBase, "Notification daemon location as URI, e.g. [scheme]://[host[:port]]")
 	flag.StringVar(&datastoreBase, "datastore", kvDefaultURL(), "Datastore Service location as URI")
+	flag.StringVar(&sqlHost, "postgres-host", sqlHost, "Postgres host as IP address or name (default: "+sqlHost+")")
 	flag.StringVar(&serviceName, "service-name", serviceName, "Boot script service name")
 	flag.StringVar(&spireTokensBaseURL, "spire-url", spireServiceURL, "Spire join token service base URL")
 	flag.StringVar(&advertiseAddress, "cloud-init-address", advertiseAddress, "IP:PORT to advertise for cloud-init calls. This needs to be an IP as we do not have DNS when cloud-init runs")
 	flag.BoolVar(&insecure, "insecure", insecure, "Don't enforce https certificate security")
+	flag.BoolVar(&sqlInsecure, "postgres-insecure", sqlInsecure, "Don't enforce certificate authority for Postgres")
 	flag.BoolVar(&debugFlag, "debug", debugFlag, "Enable debug output")
+	flag.BoolVar(&useSQL, "postgres", useSQL, "Use Postgres instead of ETCD")
 	flag.UintVar(&retryDelay, "retry-delay", retryDelay, "Retry delay in seconds")
 	flag.UintVar(&hsmRetrievalDelay, "hsm-retrieval-delay", hsmRetrievalDelay, "SM Retrieval delay in seconds")
+	flag.UintVar(&sqlPort, "postgres-port", sqlPort, "Postgres port (default: "+fmt.Sprintf("%d", sqlPort)+")")
 	flag.Parse()
 
 	sn, snerr := base.GetServiceInstanceName()
@@ -262,14 +352,43 @@ func main() {
 
 	notifier = newNotifier(serviceName, nfdBase+"/hmi/v1/subscribe", getNotifierURL(), svcOpts)
 
-	kvRetyCount, kvRetryWait, err := kvDefaultRetryConfig()
-	if err != nil {
-		log.Fatal("Unable to parse ETCD default")
-	}
+	// If --postgres passed, use Postgres. Otherwise, use Etcd.
+	if useSQL {
+		sqlRetryCount, sqlRetryWait, err := sqlDefaultRetryConfig()
+		if err != nil {
+			log.Println("WARNING: getting retry config failed: ", err)
+			log.Printf("WARNING: using default retry config: SQL_RETRY_COUNT=%d SQL_RETRY_WAIT=%d\n", sqlRetryCount, sqlRetryWait)
+		}
 
-	err = kvOpen(datastoreBase, svcOpts, kvRetyCount, kvRetryWait)
-	if err != nil {
-		log.Fatalf("Access to Datastore service %s with name %s failed: %v\n", datastoreBase, serviceName, err)
+		var sqlUser, sqlPassword string
+		sqlUser, sqlPassword, err = sqlGetCreds()
+		if err != nil {
+			log.Fatalf("ERROR: could not get Postgres credentials: %v\n", err)
+		}
+
+		// Initiate connection to Postgres.
+		log.Printf("Using insecure connection to SQL database: %v\n", sqlInsecure)
+		bssdb, err = sqlOpen(sqlHost, sqlPort, sqlUser, sqlPassword, !sqlInsecure, sqlRetryCount, sqlRetryWait)
+		if err != nil {
+			log.Fatalf("Access to Postgres database at %s:%d failed: %v\n", sqlHost, sqlPort, err)
+		}
+		defer sqlClose()
+
+		// Create database and tables (if they do not exist).
+		err = bssdb.CreateDB(bssdbName)
+		if err != nil {
+			log.Fatalf("Creating Postgres database %q and tables failed: %v\n", bssdbName, err)
+		}
+	} else {
+		kvRetyCount, kvRetryWait, err := kvDefaultRetryConfig()
+		if err != nil {
+			log.Fatal("Unable to parse ETCD default")
+		}
+
+		err = kvOpen(datastoreBase, svcOpts, kvRetyCount, kvRetryWait)
+		if err != nil {
+			log.Fatalf("Access to Datastore service %s with name %s failed: %v\n", datastoreBase, serviceName, err)
+		}
 	}
 	err = spireTokenServiceInit(spireServiceURL, svcOpts)
 	if err != nil {

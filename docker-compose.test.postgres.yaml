@@ -1,0 +1,89 @@
+version: '3.7'
+
+networks:
+  bss:
+  smd:
+
+services:
+  postgres-bss:
+    hostname: postgres-bss
+    image: postgres:11-alpine
+    environment:
+      - POSTGRES_PASSWORD=bssuser
+      - POSTGRES_USER=bssuser
+      - POSTGRES_DB=bssdb
+    ports:
+      - '5432:5432'
+    networks:
+      - bss
+  postgres-smd:
+    hostname: postgres-smd
+    image: postgres:11-alpine
+    environment:
+      - POSTGRES_PASSWORD=hmsdsuser
+      - POSTGRES_USER=hmsdsuser
+      - POSTGRES_DB=hmsds
+    ports:
+      - '5433:5432'
+    networks:
+      - smd
+  smd-init:
+    hostname: smd-init
+    image: docker.io/bikeshack/smd:v2.12.0
+    environment:
+      - POSTGRES_HOST=postgres-smd
+      - POSTGRES_PORT=5432
+    depends_on:
+      - postgres-smd
+    networks:
+      - smd
+    entrypoint:
+      - /usr/local/bin/smd-init
+      - -dbhost=postgres-smd
+  smd:
+    hostname: smd
+    image: docker.io/bikeshack/smd:v2.12.0
+    environment:
+      - POSTGRES_HOST=postgres-smd
+      - POSTGRES_PORT=5432
+    depends_on:
+      - postgres-smd
+      - smd-init
+    ports:
+      - '27779:27779'
+    networks:
+      - bss
+      - smd
+  bss:
+    hostname: bss
+    environment:
+      - POSTGRES_HOST=postgres-bss
+      - POSTGRES_PORT=5432
+      - SQL_USER=bssuser
+      - SQL_PASSWORD=bssuser
+    ports:
+      - '27778:27778'
+    build:
+      context: .
+      dockerfile: Dockerfile.bss-postgres.Dockerfile
+    depends_on:
+      - postgres-bss
+      - smd
+    networks:
+      - bss
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:27778/boot/v1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  bss-test:
+    hostname: bss-test
+    build:
+      context: .
+      dockerfile: Dockerfile.bss-postgres-test.Dockerfile
+    depends_on:
+      bss:
+        condition: service_healthy
+        restart: true
+    networks:
+      - bss
