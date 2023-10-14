@@ -31,21 +31,27 @@ services:
     hostname: smd-init
     image: docker.io/bikeshack/smd:v2.12.0
     environment:
-      - POSTGRES_HOST=postgres-smd
-      - POSTGRES_PORT=5432
+      - SMD_DBHOST=postgres-smd
+      - SMD_DBPORT=5432
+      - SMD_DBUSER=hmsdsuser
+      - SMD_DBPASS=hmsdsuser
+      - SMD_DBNAME=hmsds
+      - SMD_DBOPTS=sslmode=disable
     depends_on:
       - postgres-smd
     networks:
       - smd
-    entrypoint:
-      - /usr/local/bin/smd-init
-      - -dbhost=postgres-smd
+    command: ["/smd-init"]
   smd:
     hostname: smd
     image: docker.io/bikeshack/smd:v2.12.0
     environment:
-      - POSTGRES_HOST=postgres-smd
-      - POSTGRES_PORT=5432
+      - SMD_DBHOST=postgres-smd
+      - SMD_DBPORT=5432
+      - SMD_DBUSER=hmsdsuser
+      - SMD_DBPASS=hmsdsuser
+      - SMD_DBNAME=hmsds
+      - SMD_DBOPTS=sslmode=disable
     depends_on:
       - postgres-smd
       - smd-init

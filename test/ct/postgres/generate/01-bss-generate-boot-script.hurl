@@ -1,5 +1,5 @@
 # Generate a boot script for an xname and return it.
-GET http://bss:27778/boot/v1/bootscript?name=x0c0s1b0n0
+GET http://bss:27778/boot/v1/bootscript?name=x0c0s1b0
 
 # Response should be something like:
 #

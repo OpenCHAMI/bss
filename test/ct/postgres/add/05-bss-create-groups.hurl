@@ -1,22 +1,10 @@
-# Add two xnames to BSS.
+# Try to create a group config in BSS.
 POST http://bss:27778/boot/v1/bootparameters
 {
-	"kernel": "https://testkerneluri1.tld",
-	"initrd": "https://testinitrduri1.tld",
-	"hosts": ["x0c0s1b0n0", "x0c0s2b0n0"],
-	"params": "param1,param2"
-}
-
-HTTP 201
-
-# Add another xname to BSS (to see if same boot config got used instead of
-# creating another).
-POST http://bss:27778/boot/v1/bootparameters
-{
-	"kernel": "https://testkerneluri1.tld",
-	"initrd": "https://testinitrduri1.tld",
-	"hosts": ["x0c0s3b0n0"],
-	"params": "param1,param2"
+	"kernel": "https://testkerneluri2.tld",
+	"initrd": "https://testinitrduri2.tld",
+	"hosts": ["testgroupname"],
+	"params": "param3,param4"
 }
 
 HTTP 201
@@ -28,9 +16,9 @@ GET http://bss:27778/boot/v1/bootparameters
 # [
 #	 {
 #		 "hosts": [
-#			 "x0c0s1b0n0",
-#			 "x0c0s2b0n0",
-#			 "x0c0s3b0n0"
+#			 "x0c0s1b0",
+#			 "x0c0s2b0",
+#			 "x0c0s3b0"
 #		 ],
 #		 "params": "param1,param2",
 #		 "kernel": "https://testkerneluri1.tld",
@@ -49,13 +37,15 @@ GET http://bss:27778/boot/v1/bootparameters
 #		 }
 #	 }
 # ]
+#
+# NOTE: Group names are not added new, so "testgroupname" does not appear here.
 HTTP 200
 Content-Type: application/json; charset=UTF-8
 [Asserts]
 jsonpath "$[0].hosts" count == 3
-jsonpath "$[0].hosts[*]" includes "x0c0s1b0n0"
-jsonpath "$[0].hosts[*]" includes "x0c0s2b0n0"
-jsonpath "$[0].hosts[*]" includes "x0c0s3b0n0"
+jsonpath "$[0].hosts[*]" includes "x0c0s1b0"
+jsonpath "$[0].hosts[*]" includes "x0c0s2b0"
+jsonpath "$[0].hosts[*]" includes "x0c0s3b0"
 jsonpath "$[0].params" == "param1,param2"
 jsonpath "$[0].kernel" == "https://testkerneluri1.tld"
 jsonpath "$[0].initrd" == "https://testinitrduri1.tld"
