@@ -838,7 +838,11 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 				chain += "?name=" + comp.ID
 			}
 			chain += fmt.Sprintf("&retry=%d", retry+1)
-			retreivingState = checkState(false)
+			if useSQL {
+				retreivingState = false
+			} else {
+				retreivingState = checkState(false)
+			}
 			if retreivingState {
 				// We want to respond with a delayed chain response so that the
 				// node will retry in a bit after we have updated our state info
@@ -859,7 +863,9 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 				log.Printf("BSS request succeeded for %s", descr)
 
 				// Record the fact this was asked for.
-				updateEndpointAccessed(comp.ID, bssTypes.EndpointTypeBootscript)
+				if !useSQL {
+					updateEndpointAccessed(comp.ID, bssTypes.EndpointTypeBootscript)
+				}
 			}
 		} else {
 			log.Printf("BSS request failed writing response for %s: %s", descr, err.Error())
