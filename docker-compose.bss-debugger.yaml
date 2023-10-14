@@ -93,3 +93,16 @@ services:
         restart: true
     networks:
       - bss
+  bss-debugger:
+    image: alpine:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.bss-debugger.Dockerfile
+    hostname: bss-debugger
+    depends_on:
+      - bss-test
+    networks:
+      - bss
+    entrypoint: "/bin/sh"
+    tty: true
+    stdin_open: true
