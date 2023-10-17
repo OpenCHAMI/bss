@@ -15,6 +15,7 @@ HTTP 200
 [Asserts]
 body contains "#!ipxe"
 body contains "kernel --name kernel https://testkerneluri1.tld initrd=initrd param1,param2 xname=x0c0s1b0 ds=nocloud-net;s=localhost/ || goto boot_retry"
+body contains "initrd --name initrd https://testinitrduri1.tld || goto boot_retry"
 body contains "boot || goto boot_retry"
 body contains ":boot_retry"
 body contains "sleep 30"
