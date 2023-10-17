@@ -1439,6 +1439,11 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 // boot config IDs that were deleted are returned. If an error occurs with the deletion, it is
 // returned.
 func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDeleted []string, err error) {
+	var (
+		delNodes []Node
+		delBcs   []BootConfig
+	)
+
 	// Delete nodes/boot configs by specifying one or more nodes. Leave boot configs that are
 	// attached to nodes that won't be deleted.
 	switch {
@@ -1459,10 +1464,6 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 		}
 		// The BSS API only supports adding a boot config for _either_ a node group or a set
 		// of nodes. Thus, we do either or here.
-		var (
-			delNodes []Node
-			delBcs   []BootConfig
-		)
 		if len(groupNames) > 0 {
 			// Group name(s) specified, add boot config by group.
 			delNodes, delBcs, err = bddb.deleteBootConfigByGroup(groupNames)
@@ -1472,11 +1473,17 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 			}
 		} else if len(xNames) > 0 {
 			// XName(s) specified, delete node(s) and relative boot configs.
-			delNodes, delBcs, err = bddb.deleteNodesWithBootConfigs(xNames, bp.Macs, bp.Nids)
+			delNodes, delBcs, err = bddb.deleteNodesWithBootConfigs(xNames, []string{}, []int32{})
 			if err != nil {
 				err = fmt.Errorf("postgres.Delete: %v", err)
 				return nodesDeleted, bcsDeleted, err
 			}
+		}
+	case len(bp.Macs) > 0:
+		delNodes, delBcs, err = bddb.deleteNodesWithBootConfigs([]string{}, bp.Macs, []int32{})
+		if err != nil {
+			err = fmt.Errorf("postgres.Delete: %v", err)
+			return nodesDeleted, bcsDeleted, err
 		}
 
 		for _, node := range delNodes {
@@ -1485,27 +1492,33 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 		for _, bc := range delBcs {
 			bcsDeleted = append(bcsDeleted, bc.Id)
 		}
-	case len(bp.Macs) > 0:
 	case len(bp.Nids) > 0:
-	}
-
-	// Delete nodes/boot configs by specifying the boot configuration.
-	if bp.Kernel != "" || bp.Initrd != "" || bp.Params != "" {
-		var (
-			delConfigNodes []Node
-			delConfigs     []BootConfig
-		)
-		delConfigNodes, delConfigs, err = bddb.deleteBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
+		delNodes, delBcs, err = bddb.deleteNodesWithBootConfigs([]string{}, []string{}, bp.Nids)
 		if err != nil {
 			err = fmt.Errorf("postgres.Delete: %v", err)
 			return nodesDeleted, bcsDeleted, err
 		}
-		for _, node := range delConfigNodes {
+
+		for _, node := range delNodes {
 			nodesDeleted = append(nodesDeleted, node.Id)
 		}
-		for _, bc := range delConfigs {
+		for _, bc := range delBcs {
 			bcsDeleted = append(bcsDeleted, bc.Id)
 		}
+	// Delete nodes/boot configs by specifying the boot configuration.
+	case bp.Kernel != "" || bp.Initrd != "" || bp.Params != "":
+		delNodes, delBcs, err = bddb.deleteBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
+		if err != nil {
+			err = fmt.Errorf("postgres.Delete: %v", err)
+			return nodesDeleted, bcsDeleted, err
+		}
+	}
+
+	for _, node := range delNodes {
+		nodesDeleted = append(nodesDeleted, node.Id)
+	}
+	for _, bc := range delBcs {
+		bcsDeleted = append(bcsDeleted, bc.Id)
 	}
 
 	return nodesDeleted, bcsDeleted, err
