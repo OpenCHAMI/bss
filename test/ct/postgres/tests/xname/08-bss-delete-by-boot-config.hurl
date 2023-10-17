@@ -1,4 +1,4 @@
-# Delete a boot config and its nodes.
+# Delete everything (by boot config).
 DELETE http://bss:27778/boot/v1/bootparameters
 {
 	"kernel": "https://testkerneluri1.tld",

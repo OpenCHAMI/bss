@@ -3,6 +3,5 @@
 
 set -e
 
-"$(dirname $0)"/add.sh
-"$(dirname $0)"/generate.sh
-"$(dirname $0)"/delete.sh
+# Test add/delete/get boot config by XName.
+/usr/bin/hurl --test "$(dirname $0)"/tests/xname/*.hurl
