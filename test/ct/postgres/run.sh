@@ -11,7 +11,7 @@ echo '===================================='
 
 # Test add/delete/get boot config by MAC address.
 echo '===================================='
-echo 'EXECUTING mac UNIT TESTS...'
+echo 'EXECUTING mac INTEGRATION TESTS...'
 echo '===================================='
 /usr/bin/hurl --test "$(dirname $0)"/tests/mac/*.hurl
 
@@ -21,11 +21,11 @@ echo '===================================='
 # fail. Therefore, this test is commented out for now until SMD handles
 # NIDs correctly.
 ## Test add/delete/get boot config by NID.
-#echo '============================='
-#echo 'EXECUTING mac UNIT TESTS...'
-#echo '============================='
+#echo '===================================='
+#echo 'EXECUTING mac INTEGRATION TESTS...'
+#echo '===================================='
 #/usr/bin/hurl --test "$(dirname $0)"/tests/nid/*.hurl
 
 echo '===================================='
-echo 'ALL UNIT TESTS COMPLETED'
+echo 'ALL INTEGRATION TESTS COMPLETED'
 echo '===================================='
