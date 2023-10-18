@@ -313,7 +313,7 @@ func main() {
 	flag.StringVar(&hsmBase, "hsm", hsmBase, "Hardware State Manager location as URI, e.g. [scheme]://[host[:port]]")
 	flag.StringVar(&nfdBase, "nfd", nfdBase, "Notification daemon location as URI, e.g. [scheme]://[host[:port]]")
 	flag.StringVar(&datastoreBase, "datastore", kvDefaultURL(), "Datastore Service location as URI")
-	flag.StringVar(&sqlHost, "postgres-host", sqlHost, "Postgres host as IP address or name (default: "+sqlHost+")")
+	flag.StringVar(&sqlHost, "postgres-host", sqlHost, "Postgres host as IP address or name")
 	flag.StringVar(&serviceName, "service-name", serviceName, "Boot script service name")
 	flag.StringVar(&spireTokensBaseURL, "spire-url", spireServiceURL, "Spire join token service base URL")
 	flag.StringVar(&advertiseAddress, "cloud-init-address", advertiseAddress, "IP:PORT to advertise for cloud-init calls. This needs to be an IP as we do not have DNS when cloud-init runs")
@@ -323,7 +323,7 @@ func main() {
 	flag.BoolVar(&useSQL, "postgres", useSQL, "Use Postgres instead of ETCD")
 	flag.UintVar(&retryDelay, "retry-delay", retryDelay, "Retry delay in seconds")
 	flag.UintVar(&hsmRetrievalDelay, "hsm-retrieval-delay", hsmRetrievalDelay, "SM Retrieval delay in seconds")
-	flag.UintVar(&sqlPort, "postgres-port", sqlPort, "Postgres port (default: "+fmt.Sprintf("%d", sqlPort)+")")
+	flag.UintVar(&sqlPort, "postgres-port", sqlPort, "Postgres port")
 	flag.Parse()
 
 	sn, snerr := base.GetServiceInstanceName()
