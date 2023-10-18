@@ -4,15 +4,15 @@
 set -e
 
 # Test add/delete/get boot config by XName.
-echo '============================='
-echo 'EXECUTING xname UNIT TESTS...'
-echo '============================='
+echo '===================================='
+echo 'EXECUTING xname INTEGRATION TESTS...'
+echo '===================================='
 /usr/bin/hurl --test "$(dirname $0)"/tests/xname/*.hurl
 
 # Test add/delete/get boot config by MAC address.
-echo '============================='
+echo '===================================='
 echo 'EXECUTING mac UNIT TESTS...'
-echo '============================='
+echo '===================================='
 /usr/bin/hurl --test "$(dirname $0)"/tests/mac/*.hurl
 
 # The version of SMD we are using does not support updating/displaying
@@ -26,6 +26,6 @@ echo '============================='
 #echo '============================='
 #/usr/bin/hurl --test "$(dirname $0)"/tests/nid/*.hurl
 
-echo '============================='
+echo '===================================='
 echo 'ALL UNIT TESTS COMPLETED'
-echo '============================='
+echo '===================================='
