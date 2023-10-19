@@ -58,6 +58,13 @@ COPY .version /
 USER 65534:65534
 
 # Set up the command to start the service.
-CMD /usr/local/bin/boot-script-service $BSS_OPTS --cloud-init-address localhost --postgres --postgres-host $POSTGRES_HOST --postgres-port $POSTGRES_PORT --retry-delay=$BSS_RETRY_DELAY --hsm $HSM_URL --hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
+CMD /usr/local/bin/boot-script-service $BSS_OPTS \
+	--cloud-init-address localhost \
+	--postgres \
+	--postgres-host $POSTGRES_HOST \
+	--postgres-port $POSTGRES_PORT \
+	--retry-delay=$BSS_RETRY_DELAY \
+	--hsm $HSM_URL \
+	--hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
 
 ENTRYPOINT ["/sbin/tini", "--"]
