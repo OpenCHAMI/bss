@@ -21,9 +21,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 FROM alpine:3.15
+FROM cgr.dev/chainguard/wolfi-base
 LABEL maintainer="Hewlett Packard Enterprise"
 EXPOSE 27778
 STOPSIGNAL SIGTERM
+
+RUN apk add --no-cache tini
 
 # Setup environment variables.
 ENV HSM_URL=http://smd:27779
@@ -56,5 +59,7 @@ COPY .version /
 # nobody 65534:65534
 USER 65534:65534
 
-# Set up the command to start the service, the run the init script.
-CMD boot-script-service $BSS_OPTS --cloud-init-address localhost --postgres --postgres-host $POSTGRES_HOST --postgres-port $POSTGRES_PORT --retry-delay=$BSS_RETRY_DELAY --hsm $HSM_URL --hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
+# Set up the command to start the service.
+CMD /usr/local/bin/boot-script-service $BSS_OPTS --cloud-init-address localhost --postgres --postgres-host $POSTGRES_HOST --postgres-port $POSTGRES_PORT --retry-delay=$BSS_RETRY_DELAY --hsm $HSM_URL --hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
+
+ENTRYPOINT ["/sbin/tini", "--"]
