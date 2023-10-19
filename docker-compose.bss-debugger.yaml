@@ -71,7 +71,6 @@ services:
       - '27778:27778'
     build:
       context: .
-      dockerfile: Dockerfile.bss-postgres.Dockerfile
     depends_on:
       - postgres-bss
       - smd
