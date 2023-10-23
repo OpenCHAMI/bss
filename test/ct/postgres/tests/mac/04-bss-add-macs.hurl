@@ -10,12 +10,13 @@ POST http://bss:27778/boot/v1/bootparameters
 HTTP 201
 
 # Add another MAC address to BSS (to see if same boot config got used instead of
-# creating another).
+# creating another). Also, use an upper-case MAC address. BSS should store this
+# as lower case.
 POST http://bss:27778/boot/v1/bootparameters
 {
 	"kernel": "https://testkerneluri2.tld",
 	"initrd": "https://testinitrduri2.tld",
-	"macs": ["02:0b:b8:00:30:04"],
+	"macs": ["02:0B:B8:00:30:04"],
 	"params": "param3,param4"
 }
 

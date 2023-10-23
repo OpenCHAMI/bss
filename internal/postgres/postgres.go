@@ -112,11 +112,12 @@ func Connect(host string, port uint, user, password string, ssl bool) (BootDataD
 	return bddb, err
 }
 
-// NewNode creates a new Node and populates it with the boot MAC address, XName, and NID specified.
-// Before returning the Node, its ID is populated with a new unique identifier.
+// NewNode creates a new Node and populates it with the boot MAC address (converts to lower case),
+// XName, and NID specified.  Before returning the Node, its ID is populated with a new unique
+// identifier.
 func NewNode(mac, xname string, nid int32) (n Node) {
 	n.Id = uuid.Generate().String()
-	n.BootMac = mac
+	n.BootMac = strings.ToLower(mac)
 	n.Xname = xname
 	n.Nid = nid
 	return n
@@ -267,7 +268,12 @@ func (bddb BootDataDatabase) GetNodesByItems(macs, xnames []string, nids []int32
 			}
 			switch i {
 			case 0:
-				qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macs))
+				// Ignore case when searching by MAC.
+				var macsLower []string
+				for _, mac := range macs {
+					macsLower = append(macsLower, strings.ToLower(mac))
+				}
+				qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macsLower))
 			case 1:
 				qstr += fmt.Sprintf(` xname IN %s`, stringSliceToSql(xnames))
 			case 2:
@@ -1156,7 +1162,12 @@ func (bddb BootDataDatabase) deleteNodesByItems(hosts, macs []string, nids []int
 			case 0:
 				qstr += fmt.Sprintf(` xname IN %s`, stringSliceToSql(hosts))
 			case 1:
-				qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macs))
+				// Ignore case when matching MAC addresses.
+				var macsLower []string
+				for _, mac := range macs {
+					macsLower = append(macsLower, strings.ToLower(mac))
+				}
+				qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macsLower))
 			case 2:
 				qstr += fmt.Sprintf(` nid IN %s`, int32SliceToSql(nids))
 			}
@@ -1257,6 +1268,7 @@ func (bddb BootDataDatabase) deleteBootConfigByGroup(groupNames []string) (nodeL
 // BootConfig are also deleted. A slice of deleted Node items and a slice of deleted BootConfig
 // items are returned. If an error occurs with any of the SQL queries, an error is returned.
 func (bddb BootDataDatabase) deleteNodesWithBootConfigs(hosts, macs []string, nids []int32) (nodeList []Node, bcList []BootConfig, err error) {
+	// MAC address comparison is case-insensitive.
 	nodeList, err = bddb.deleteNodesByItems(hosts, macs, nids)
 	if err != nil {
 		err = fmt.Errorf("Error deleting Node(s): %v", err)
@@ -1404,7 +1416,12 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 
 		// Store list of nodes to add.
 		for _, mac := range bp.Macs {
-			if existingNodeMap[mac] == (Node{}) {
+			if _, ok := existingNodeMap[strings.ToLower(mac)]; !ok {
+				// Store using lower case version of MAC address. When the MAC
+				// address is compared for retrieval/deletion/update, it will be
+				// converted into lower case before comparison, effectively ignoring
+				// case. This will prevent duplicate MAC addresses due to case
+				// difference.
 				nodesToAdd = append(nodesToAdd, NewNode(mac, "", 0))
 			}
 		}
@@ -1421,6 +1438,11 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 				nodesToAdd = append(nodesToAdd, NewNode("", "", nid))
 			}
 		}
+	}
+
+	if len(nodesToAdd) == 0 {
+		err = fmt.Errorf("postgres.Add: No nodes to add (possible duplicate(s))")
+		return result, err
 	}
 
 	// Add any nonexisting nodes, plus their boot config as needed.
@@ -1480,6 +1502,8 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 			}
 		}
 	case len(bp.Macs) > 0:
+		// This deletion function will ignore the case of the passed MAC addresses by first
+		// converting them to lower case before comparison.
 		delNodes, delBcs, err = bddb.deleteNodesWithBootConfigs([]string{}, bp.Macs, []int32{})
 		if err != nil {
 			err = fmt.Errorf("postgres.Delete: %v", err)
@@ -1666,11 +1690,17 @@ func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootP
 		return results, nil
 	}
 
+	// Ignore case for MAC addresses.
+	var macsLower []string
+	for _, mac := range macs {
+		macsLower = append(macsLower, strings.ToLower(mac))
+	}
+
 	qstr := "SELECT n.boot_mac, bc.kernel_uri, bc.initrd_uri, bc.cmdline FROM nodes AS n" +
 		" LEFT JOIN boot_group_assignments AS bga ON n.id=bga.node_id" +
 		" JOIN boot_groups AS bg on bga.boot_group_id=bg.id" +
 		" JOIN boot_configs AS bc ON bg.boot_config_id=bc.id" +
-		" WHERE n.boot_mac IN " + stringSliceToSql(macs) +
+		" WHERE n.boot_mac IN " + stringSliceToSql(macsLower) +
 		";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
