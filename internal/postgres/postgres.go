@@ -585,7 +585,7 @@ func (bddb BootDataDatabase) addBootConfigByGroup(groupNames []string, kernelUri
 	results := make(map[string]string)
 
 	if len(groupNames) == 0 {
-		return results, fmt.Errorf("No group names specified to add.")
+		return results, fmt.Errorf("No group names specified to add")
 	}
 
 	// See if group name exists, if passed.
@@ -713,7 +713,7 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 		bgaList        []BootGroupAssignment
 	)
 	if len(nodeList) == 0 {
-		return result, fmt.Errorf("No nodes specified to add boot configurations for.")
+		return result, fmt.Errorf("No nodes specified to add boot configurations for")
 	}
 	existingBgList, existingBcList, numResults, err = bddb.GetBootConfigsByItems(kernelUri, initrdUri, cmdline)
 	if err != nil {
@@ -804,7 +804,7 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 // with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootGroupsByName(names []string) (bgList []BootGroup, err error) {
 	if len(names) == 0 {
-		err = fmt.Errorf("No boot group names specified to delete.")
+		err = fmt.Errorf("No boot group names specified to delete")
 		return bgList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -840,7 +840,7 @@ func (bddb BootDataDatabase) deleteBootGroupsByName(names []string) (bgList []Bo
 // an error occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootGroupsById(bgIds []string) (bgList []BootGroup, err error) {
 	if len(bgIds) == 0 {
-		err = fmt.Errorf("No boot group IDs specified to delete.")
+		err = fmt.Errorf("No boot group IDs specified to delete")
 		return bgList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -876,7 +876,7 @@ func (bddb BootDataDatabase) deleteBootGroupsById(bgIds []string) (bgList []Boot
 // with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootConfigsById(bcIds []string) (bcList []BootConfig, err error) {
 	if len(bcIds) == 0 {
-		err = fmt.Errorf("No boot config IDs specified to delete.")
+		err = fmt.Errorf("No boot config IDs specified to delete")
 		return bcList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -1041,7 +1041,7 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 // were deleted. If an error occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootGroupAssignmentsByGroupId(bgIds []string) (bgaList []BootGroupAssignment, err error) {
 	if len(bgIds) == 0 {
-		err = fmt.Errorf("No boot group IDs specified for deleting boot group assignments.")
+		err = fmt.Errorf("No boot group IDs specified for deleting boot group assignments")
 		return bgaList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -1077,7 +1077,7 @@ func (bddb BootDataDatabase) deleteBootGroupAssignmentsByGroupId(bgIds []string)
 // occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootGroupAssignmentsByNodeId(nodeIds []string) (bgaList []BootGroupAssignment, err error) {
 	if len(nodeIds) == 0 {
-		err = fmt.Errorf("No node IDs specified for deleting boot group assignments.")
+		err = fmt.Errorf("No node IDs specified for deleting boot group assignments")
 		return bgaList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -1112,7 +1112,7 @@ func (bddb BootDataDatabase) deleteBootGroupAssignmentsByNodeId(nodeIds []string
 // an error occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteNodesById(nodeIds []string) (nodeList []Node, err error) {
 	if len(nodeIds) == 0 {
-		err = fmt.Errorf("No node IDs specified for deletion.")
+		err = fmt.Errorf("No node IDs specified for deletion")
 		return nodeList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -1148,7 +1148,7 @@ func (bddb BootDataDatabase) deleteNodesById(nodeIds []string) (nodeList []Node,
 // nodes is returned. If an error occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteNodesByItems(hosts, macs []string, nids []int32) (nodeList []Node, err error) {
 	if len(hosts) == 0 && len(macs) == 0 && len(nids) == 0 {
-		err = fmt.Errorf("No hosts, MAC addresses, or NIDs specified to delete nodes.")
+		err = fmt.Errorf("No hosts, MAC addresses, or NIDs specified to delete nodes")
 		return nodeList, err
 	}
 	qstr := `DELETE FROM nodes WHERE`
@@ -1208,7 +1208,7 @@ func (bddb BootDataDatabase) deleteNodesByItems(hosts, macs []string, nids []int
 // SQL queries occurs, it is returned.
 func (bddb BootDataDatabase) deleteBootConfigByGroup(groupNames []string) (nodeList []Node, bcList []BootConfig, err error) {
 	if len(groupNames) == 0 {
-		return nodeList, bcList, fmt.Errorf("No group names specified for deletion.")
+		return nodeList, bcList, fmt.Errorf("No group names specified for deletion")
 	}
 
 	// Delete matching boot groups, store deleted ones.
@@ -1490,7 +1490,7 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 			// Group name(s) specified, add boot config by group.
 			delNodes, delBcs, err = bddb.deleteBootConfigByGroup(groupNames)
 			if err != nil {
-				err = fmt.Errorf("postgres.Add: %v", err)
+				err = fmt.Errorf("postgres.Delete: %v", err)
 				return nodesDeleted, bcsDeleted, err
 			}
 		} else if len(xNames) > 0 {
@@ -1685,7 +1685,7 @@ func (bddb BootDataDatabase) GetBootParamsByName(names []string) ([]bssTypes.Boo
 func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootParams, error) {
 	var results []bssTypes.BootParams
 
-	// If inout is empty, so is the output.
+	// If input is empty, so is the output.
 	if len(macs) == 0 {
 		return results, nil
 	}
