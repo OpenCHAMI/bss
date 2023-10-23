@@ -20,9 +20,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-FROM alpine:3.15
 FROM cgr.dev/chainguard/wolfi-base
-LABEL maintainer="Hewlett Packard Enterprise"
 EXPOSE 27778
 STOPSIGNAL SIGTERM
 
@@ -60,6 +58,13 @@ COPY .version /
 USER 65534:65534
 
 # Set up the command to start the service.
-CMD /usr/local/bin/boot-script-service $BSS_OPTS --cloud-init-address localhost --postgres --postgres-host $POSTGRES_HOST --postgres-port $POSTGRES_PORT --retry-delay=$BSS_RETRY_DELAY --hsm $HSM_URL --hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
+CMD /usr/local/bin/boot-script-service $BSS_OPTS \
+	--cloud-init-address localhost \
+	--postgres \
+	--postgres-host $POSTGRES_HOST \
+	--postgres-port $POSTGRES_PORT \
+	--retry-delay=$BSS_RETRY_DELAY \
+	--hsm $HSM_URL \
+	--hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
 
 ENTRYPOINT ["/sbin/tini", "--"]
