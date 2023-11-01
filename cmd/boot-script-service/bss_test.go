@@ -35,7 +35,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Cray-HPE/hms-bss/pkg/bssTypes"
+	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 )
 
 func TestMain(m *testing.M) {

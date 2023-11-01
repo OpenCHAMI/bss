@@ -53,8 +53,8 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
-	"github.com/Cray-HPE/hms-bss/pkg/bssTypes"
 	hms_s3 "github.com/Cray-HPE/hms-s3"
+	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 )
 
 const (
@@ -177,7 +177,7 @@ func BootparametersGetAll(w http.ResponseWriter, r *http.Request) {
 	var results []bssTypes.BootParams
 	if useSQL {
 		var (
-			err error
+			err   error
 			nodes []string
 		)
 		results, err = bssdb.GetBootParamsAll()

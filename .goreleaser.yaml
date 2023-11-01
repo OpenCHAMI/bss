@@ -1,14 +1,14 @@
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
 
-project_name: hms-bss
+project_name: bss
 before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
 
 builds:
-  - id: hms-bss
+  - id: bss
     main: ./cmd/boot-script-service
     binary: boot-script-service
     goos:
@@ -22,10 +22,10 @@ builds:
 dockers:
   - 
     image_templates:
-      - bikeshack/{{.ProjectName}}:latest
-      - bikeshack/{{.ProjectName}}:{{ .Tag }}
-      - bikeshack/{{.ProjectName}}:{{ .Major }}
-      - bikeshack/{{.ProjectName}}:{{ .Major }}.{{ .Minor }}
+      - ghcr.io/openchami/{{.ProjectName}}:latest
+      - ghcr.io/openchami/{{.ProjectName}}:{{ .Tag }}
+      - ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}
+      - ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}.{{ .Minor }}
     build_flag_templates:
       - "--pull"
       - "--label=org.opencontainers.image.created={{.Date}}"

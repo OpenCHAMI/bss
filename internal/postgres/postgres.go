@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Cray-HPE/hms-bss/pkg/bssTypes"
+	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 	"github.com/docker/distribution/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"

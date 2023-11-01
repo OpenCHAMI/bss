@@ -49,8 +49,8 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
-	"github.com/Cray-HPE/hms-bss/internal/postgres"
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
+	"github.com/OpenCHAMI/bss/internal/postgres"
 )
 
 const kvDefaultRetryCount uint64 = 10
@@ -230,7 +230,7 @@ func sqlGetCreds() (user, password string, err error) {
 
 func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount, retryWait uint64) (postgres.BootDataDatabase, error) {
 	var (
-		err error
+		err  error
 		bddb postgres.BootDataDatabase
 	)
 	ix := uint64(1)

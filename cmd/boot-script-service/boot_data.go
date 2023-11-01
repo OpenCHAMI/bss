@@ -42,8 +42,8 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
-	"github.com/Cray-HPE/hms-bss/pkg/bssTypes"
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
+	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/uuid"
 )
