@@ -9,6 +9,5 @@ kubernetes/.packaged/
 *.csr
 *.key
 *.pem
+dist/
 
-# compiled go command
-boot-script-service

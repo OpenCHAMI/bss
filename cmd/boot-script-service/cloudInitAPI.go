@@ -28,11 +28,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Cray-HPE/hms-bss/pkg/bssTypes"
 	"log"
 	"math/rand"
 	"net/http"
 	"strings"
+
+	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 
 	yaml "gopkg.in/yaml.v2"
 
