@@ -503,6 +503,18 @@ func Store(bp bssTypes.BootParams) (error, string) {
 // The update function will update entries but not NULL out existing entries.
 func Update(bp bssTypes.BootParams) error {
 	debugf("Update(%v)\n", bp)
+
+	// Perform postgres.Update() and return if postgres is enabled.
+	if useSQL {
+		debugf("postgres.Update(%v)", bp)
+		nodesUpdated, err := bssdb.Update(bp)
+		if err != nil {
+			return err
+		}
+		debugf("Node IDs updated: %v", nodesUpdated)
+		return err
+	}
+
 	var kernel_id, initrd_id string
 	var err error
 	if bp.Kernel != "" {
