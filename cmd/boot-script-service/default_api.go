@@ -284,89 +284,97 @@ func BootparametersGet(w http.ResponseWriter, r *http.Request) {
 
 	debugf("Received boot parameters: %v\n", args)
 	var results []bssTypes.BootParams
-	if args.Kernel != "" || args.Initrd != "" {
-		for _, image := range GetKernelInfo() {
-			if image.Path == args.Kernel {
+	if useSQL {
+		debugf("SqlGetBootParams(%v, %v, %v)", args.Macs, args.Hosts, args.Nids)
+		results, err = SqlGetBootParams(args.Macs, args.Hosts, args.Nids)
+		if err != nil {
+			log.Printf("Could not retrieve all boot parameters from PostgreSQL: %v", err)
+		}
+	} else {
+		if args.Kernel != "" || args.Initrd != "" {
+			for _, image := range GetKernelInfo() {
+				if image.Path == args.Kernel {
+					var bp bssTypes.BootParams
+					bp.Params = image.Params
+					bp.Kernel = image.Path
+					results = append(results, bp)
+				}
+			}
+			for _, image := range GetInitrdInfo() {
+				if image.Path == args.Initrd {
+					var bp bssTypes.BootParams
+					bp.Params = image.Params
+					bp.Initrd = image.Path
+					results = append(results, bp)
+				}
+			}
+		}
+		var unfoundHosts []string
+		for _, v := range args.Hosts {
+			bd, err := LookupBootData(v)
+			if err == nil {
 				var bp bssTypes.BootParams
-				bp.Params = image.Params
-				bp.Kernel = image.Path
-				results = append(results, bp)
-			}
-		}
-		for _, image := range GetInitrdInfo() {
-			if image.Path == args.Initrd {
-				var bp bssTypes.BootParams
-				bp.Params = image.Params
-				bp.Initrd = image.Path
-				results = append(results, bp)
-			}
-		}
-	}
-	var unfoundHosts []string
-	for _, v := range args.Hosts {
-		bd, err := LookupBootData(v)
-		if err == nil {
-			var bp bssTypes.BootParams
-			bp.Hosts = append(bp.Hosts, v)
-			bp.Params = bd.Params
-			bp.Kernel = bd.Kernel.Path
-			bp.Initrd = bd.Initrd.Path
-			bp.CloudInit = bd.CloudInit
-			results = append(results, bp)
-		} else {
-			unfoundHosts = append(unfoundHosts, v)
-		}
-	}
-	args.Hosts = unfoundHosts
-
-	if len(args.Hosts) > 0 || len(args.Macs) > 0 || len(args.Nids) > 0 {
-
-		nameValues := GetNamesAndValues()
-
-		kernelImages := make(map[string]ImageData)
-		initrdImages := make(map[string]ImageData)
-		for name, value := range nameValues {
-			smc := LookupComponentByName(name)
-			bd, parseErr := ToBootData(value, kernelImages, initrdImages)
-			if parseErr != nil {
-				log.Printf("Failed to parse etcd value for %s: %v\n", name, parseErr)
-			}
-
-			debugf("Found %s: %v | %v\n", name, bd, smc)
-			var bp bssTypes.BootParams
-			ok := false
-			for _, v := range args.Hosts {
-				if v == smc.ID || v == smc.Fqdn || v == name {
-					ok = true
-					break
-				}
-			}
-			if !ok {
-			Outer:
-				for _, v := range args.Macs {
-					for _, m := range smc.Mac {
-						if strings.EqualFold(v, m) {
-							ok = true
-							break Outer
-						}
-					}
-				}
-			}
-			if !ok {
-				for _, v := range args.Nids {
-					if nid, err := smc.NID.Int64(); err == nil && int64(v) == nid {
-						ok = true
-						break
-					}
-				}
-			}
-			if ok {
-				bp.Hosts = append(bp.Hosts, name)
+				bp.Hosts = append(bp.Hosts, v)
 				bp.Params = bd.Params
 				bp.Kernel = bd.Kernel.Path
 				bp.Initrd = bd.Initrd.Path
 				bp.CloudInit = bd.CloudInit
 				results = append(results, bp)
+			} else {
+				unfoundHosts = append(unfoundHosts, v)
+			}
+		}
+		args.Hosts = unfoundHosts
+
+		if len(args.Hosts) > 0 || len(args.Macs) > 0 || len(args.Nids) > 0 {
+
+			nameValues := GetNamesAndValues()
+
+			kernelImages := make(map[string]ImageData)
+			initrdImages := make(map[string]ImageData)
+			for name, value := range nameValues {
+				smc := LookupComponentByName(name)
+				bd, parseErr := ToBootData(value, kernelImages, initrdImages)
+				if parseErr != nil {
+					log.Printf("Failed to parse etcd value for %s: %v\n", name, parseErr)
+				}
+
+				debugf("Found %s: %v | %v\n", name, bd, smc)
+				var bp bssTypes.BootParams
+				ok := false
+				for _, v := range args.Hosts {
+					if v == smc.ID || v == smc.Fqdn || v == name {
+						ok = true
+						break
+					}
+				}
+				if !ok {
+				Outer:
+					for _, v := range args.Macs {
+						for _, m := range smc.Mac {
+							if strings.EqualFold(v, m) {
+								ok = true
+								break Outer
+							}
+						}
+					}
+				}
+				if !ok {
+					for _, v := range args.Nids {
+						if nid, err := smc.NID.Int64(); err == nil && int64(v) == nid {
+							ok = true
+							break
+						}
+					}
+				}
+				if ok {
+					bp.Hosts = append(bp.Hosts, name)
+					bp.Params = bd.Params
+					bp.Kernel = bd.Kernel.Path
+					bp.Initrd = bd.Initrd.Path
+					bp.CloudInit = bd.CloudInit
+					results = append(results, bp)
+				}
 			}
 		}
 	}
