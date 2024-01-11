@@ -23,7 +23,7 @@
 # Service
 NAME ?= bss
 VERSION ?= $(shell cat .version)
-BINARIES = boot-script-service
+BINARIES = boot-script-service bss-init
 
 
 all : image unittest ct snyk ct_image
