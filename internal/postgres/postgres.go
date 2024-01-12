@@ -760,58 +760,6 @@ func (bddb BootDataDatabase) Close() error {
 	return bddb.DB.Close()
 }
 
-// CreateDB executes an SQL query to create the BSS database with the specified name (if it doesn't
-// already exist) and creates the tables needed by BSS if they do not exist. If this query fails, an
-// error is returned.
-func (bddb BootDataDatabase) CreateDB(name string) (err error) {
-	// Create the database.
-	//
-	// Since Postgres doesn't support IF NOT EXISTS for creating databases, we use
-	// this workaround.
-	// Source: https://stackoverflow.com/a/18389184
-	execStr := "DO" +
-		" $do$" +
-		" BEGIN" +
-		" 	IF EXISTS (SELECT FROM pg_database WHERE datname = '" + name + "') THEN" +
-		" 		RAISE NOTICE 'Database already exists';  -- optional" +
-		" 	ELSE" +
-		" 		PERFORM dblink_exec('dbname=' || current_database(), create_database('" + name + "');" +
-		" 	END IF;" +
-		" END" +
-		" $do$;"
-
-	// Create the tables.
-	execStr = `CREATE TABLE IF NOT EXISTS nodes (
-		id varchar PRIMARY KEY,
-		boot_mac varchar,
-		xname varchar,
-		nid int
-	);
-	CREATE TABLE IF NOT EXISTS boot_configs (
-		id varchar PRIMARY KEY,
-		kernel_uri varchar,
-		initrd_uri varchar,
-		cmdline varchar
-	);
-	CREATE TABLE IF NOT EXISTS boot_groups (
-		id varchar PRIMARY KEY,
-		boot_config_id varchar,
-		name varchar,
-		description varchar
-	);
-	CREATE TABLE IF NOT EXISTS boot_group_assignments (
-		boot_group_id varchar,
-		node_id varchar
-	);`
-	_, err = bddb.DB.Exec(execStr)
-	if err != nil {
-		err = fmt.Errorf("postgres.CreateDB: %v", err)
-		return err
-	}
-
-	return err
-}
-
 // addBootConfigByGroup adds one or more BootConfig/BootGroup to the boot data database, assuming
 // that the list of names are names for node groups, if it doesn't already exist. If an error occurs
 // during any of the SQL queries, it is returned.

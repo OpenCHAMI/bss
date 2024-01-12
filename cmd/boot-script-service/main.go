@@ -473,12 +473,6 @@ func main() {
 			log.Fatalf("Access to Postgres database at %s:%d failed: %v\n", sqlHost, sqlPort, err)
 		}
 		defer sqlClose()
-
-		// Create database and tables (if they do not exist).
-		err = bssdb.CreateDB(bssdbName)
-		if err != nil {
-			log.Fatalf("Creating Postgres database %q and tables failed: %v\n", bssdbName, err)
-		}
 	} else {
 		err = kvOpen(datastoreBase, svcOpts, kvRetryCount, kvRetryWait)
 		if err != nil {
