@@ -112,6 +112,10 @@ func parseEnvVars() error {
 		parseErr error
 		errList  []error
 	)
+	parseErr = parseEnv("BSS_INSECURE", &sqlInsecure)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_INSECURE: %q", parseErr))
+	}
 	parseErr = parseEnv("BSS_DBHOST", &sqlHost)
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_DBHOST: %q", parseErr))
