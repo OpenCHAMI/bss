@@ -43,6 +43,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	db "github.com/golang-migrate/migrate/v4/database"
 	pg "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
 )
 
