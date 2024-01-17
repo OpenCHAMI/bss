@@ -182,7 +182,7 @@ func parseCmdLine() {
 	flag.Parse()
 }
 
-func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount, retryWait uint64) (*sql.DB, error) {
+func sqlOpen(host string, port uint, dbName, user, password string, ssl bool, extraDbOpts string, retryCount, retryWait uint64) (*sql.DB, error) {
 	var (
 		err     error
 		bddb    *sql.DB
@@ -194,13 +194,18 @@ func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount
 	} else {
 		sslmode = "disable"
 	}
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", user, password, host, port, sqlDbName, sslmode)
+	connStr := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s", host, port, dbName, user, password, sslmode)
+	if extraDbOpts != "" {
+		connStr += " " + extraDbOpts
+	}
+	lg.Println(connStr)
 
+	// Connect to postgres, looping every retryWait seconds up to retryCount times.
 	for ; ix <= retryCount; ix++ {
-		lg.Printf("Attempting connection to Postgres (attempt %d)", ix)
+		lg.Printf("Attempting connection to Postgres at %s:%d (attempt %d)", host, port, ix)
 		bddb, err = sql.Open("postgres", connStr)
 		if err != nil {
-			lg.Printf("ERROR: failed to open connection to Postgres (attempt %d): %v\n", ix, err)
+			lg.Printf("ERROR: failed to open connection to Postgres at %s:%d (attempt %d, retrying in %d seconds): %v\n", host, port, ix, retryWait, err)
 		} else {
 			break
 		}
@@ -212,6 +217,25 @@ func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount
 	} else {
 		lg.Printf("Initialized connection to Postgres database at %s:%d", host, port)
 	}
+
+	// Ping postgres, looping every retryWait seconds up to retryCount times.
+	for ; ix <= retryCount; ix++ {
+		lg.Printf("Attempting to ping Postgres connection at %s:%d (attempt %d)", host, port, ix)
+		err = bddb.Ping()
+		if err != nil {
+			lg.Printf("ERROR: failed to ping Postgres at %s:%d (attempt %d, retrying in %d seconds): %v\n", host, port, ix, retryWait, err)
+		} else {
+			break
+		}
+
+		time.Sleep(time.Duration(retryWait) * time.Second)
+	}
+	if ix > retryCount {
+		err = fmt.Errorf("Postgres ping attempts exhausted (%d).", retryCount)
+	} else {
+		lg.Printf("Pinged Postgres database at %s:%d", host, port)
+	}
+
 	return bddb, err
 }
 
@@ -252,7 +276,7 @@ func main() {
 	}
 
 	// Open connection to postgres.
-	bssdb, err = sqlOpen(sqlHost, sqlPort, sqlUser, sqlPass, !sqlInsecure, sqlRetryCount, sqlRetryInterval)
+	bssdb, err = sqlOpen(sqlHost, sqlPort, sqlDbName, sqlUser, sqlPass, !sqlInsecure, sqlDbOpts, sqlRetryCount, sqlRetryInterval)
 	if err != nil {
 		lg.Fatalf("ERROR: Access to Postgres database at %s:%d failed: %v\n", sqlHost, sqlPort, err)
 	}
