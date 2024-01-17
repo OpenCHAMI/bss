@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	dbName     = "bssdb"
 	xNameRegex = `^x([0-9]{1,4})c([0-7])(s([0-9]{1,4}))?b([0])(n([0-9]{1,4}))?$`
 )
 
@@ -89,7 +88,7 @@ func fieldNameToColName(fieldName string) string {
 
 // Connect opens a new connections to a Postgres database and ensures it is reachable.
 // If not, an error is thrown.
-func Connect(host string, port uint, user, password string, ssl bool) (BootDataDatabase, error) {
+func Connect(host string, port uint, dbName, user, password string, ssl bool, extraDbOpts string) (BootDataDatabase, error) {
 	var (
 		sslmode string
 		bddb    BootDataDatabase
@@ -99,7 +98,10 @@ func Connect(host string, port uint, user, password string, ssl bool) (BootDataD
 	} else {
 		sslmode = "disable"
 	}
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", user, password, host, port, dbName, sslmode)
+	connStr := fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s sslmode=%s", user, password, host, port, dbName, sslmode)
+	if extraDbOpts != "" {
+		connStr += " " + extraDbOpts
+	}
 	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
 		return bddb, err

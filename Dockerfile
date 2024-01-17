@@ -26,16 +26,18 @@ STOPSIGNAL SIGTERM
 
 RUN apk add --no-cache tini
 
-# Setup environment variables.
 ENV HSM_URL=http://smd:27779
 ENV NFD_URL=http://cray-hmnfd
+
+# For cloud-init
+ENV BSS_ADVERTISE_ADDRESS=localhost
 
 # WARNING: Our containers currently do not have certificates set up correctly
 #          to allow for https connections to other containers.  Therefore, we
 #          will use an insecure connection.  This needs to be corrected before
 #          release.  Once the certificates are properly set up, the --insecure
 #          option needs to be removed.
-ENV BSS_OPTS="--insecure --postgres-insecure"
+ENV BSS_INSECURE=true
 
 ENV BSS_RETRY_DELAY=30
 ENV BSS_HSM_RETRIEVAL_DELAY=10
@@ -58,13 +60,6 @@ COPY .version /
 USER 65534:65534
 
 # Set up the command to start the service.
-CMD /usr/local/bin/boot-script-service $BSS_OPTS \
-	--cloud-init-address localhost \
-	--postgres \
-	--postgres-host $POSTGRES_HOST \
-	--postgres-port $POSTGRES_PORT \
-	--retry-delay=$BSS_RETRY_DELAY \
-	--hsm $HSM_URL \
-	--hsm-retrieval-delay=$BSS_HSM_RETRIEVAL_DELAY
+CMD /usr/local/bin/boot-script-service
 
 ENTRYPOINT ["/sbin/tini", "--"]
