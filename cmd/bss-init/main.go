@@ -269,7 +269,10 @@ func main() {
 
 	// Check vars.
 	if forceStep < 0 || forceStep > SCHEMA_STEPS {
-		lg.Fatalf("force-step value %d out of range, should be between (inclusive) 0 and %d", forceStep, SCHEMA_STEPS)
+		if forceStep != -1 {
+			// A negative value was passed (-1 is noop).
+			lg.Fatalf("force-step value %d out of range, should be between (inclusive) 0 and %d", forceStep, SCHEMA_STEPS)
+		}
 	}
 
 	if sqlInsecure {
