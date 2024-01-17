@@ -363,6 +363,6 @@ func main() {
 	} else if err != nil {
 		lg.Fatalf("ERROR: migration.Version() failed: %v", err)
 	} else {
-		lg.Printf("Migration at version %d (dirty=%d)", version, dirty)
+		lg.Printf("Migration at version %d (dirty=%t)", version, dirty)
 	}
 }
