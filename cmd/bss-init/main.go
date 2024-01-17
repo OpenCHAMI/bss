@@ -63,7 +63,7 @@ var (
 	sqlPass          = "bssuser"
 	sqlRetryInterval = uint64(5)
 	sqlRetryCount    = uint64(10)
-	sqlMigrationDir  = ""
+	sqlMigrationDir  = "/migrations"
 	printVersion     = false
 	migrateStep      uint
 	forceStep        = -1
