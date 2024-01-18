@@ -5,40 +5,32 @@ networks:
   smd:
 
 services:
-  postgres-bss:
-    hostname: postgres-bss
+  postgres:
+    hostname: postgres
     image: postgres:11-alpine
     environment:
-      - POSTGRES_PASSWORD=bssuser
-      - POSTGRES_USER=bssuser
-      - POSTGRES_DB=bssdb
+      - POSTGRES_PASSWORD=ochamiuser
+      - POSTGRES_USER=ochamiuser
+      - POSTGRES_MULTIPLE_DATABASES=hmsds,bssdb
+    volumes:
+      - ./scripts/pg-init:/docker-entrypoint-initdb.d
     ports:
       - '5432:5432'
     networks:
       - bss
-  postgres-smd:
-    hostname: postgres-smd
-    image: postgres:11-alpine
-    environment:
-      - POSTGRES_PASSWORD=hmsdsuser
-      - POSTGRES_USER=hmsdsuser
-      - POSTGRES_DB=hmsds
-    ports:
-      - '5433:5432'
-    networks:
       - smd
   smd-init:
     hostname: smd-init
     image: ghcr.io/openchami/smd:v2.13.5
     environment:
-      - SMD_DBHOST=postgres-smd
+      - SMD_DBHOST=postgres
       - SMD_DBPORT=5432
-      - SMD_DBUSER=hmsdsuser
-      - SMD_DBPASS=hmsdsuser
+      - SMD_DBUSER=ochamiuser
+      - SMD_DBPASS=ochamiuser
       - SMD_DBNAME=hmsds
       - SMD_DBOPTS=sslmode=disable
     depends_on:
-      - postgres-smd
+      - postgres
     networks:
       - smd
     command: ["/smd-init"]
@@ -46,36 +38,56 @@ services:
     hostname: smd
     image: ghcr.io/openchami/smd:v2.13.5
     environment:
-      - SMD_DBHOST=postgres-smd
+      - SMD_DBHOST=postgres
       - SMD_DBPORT=5432
-      - SMD_DBUSER=hmsdsuser
-      - SMD_DBPASS=hmsdsuser
+      - SMD_DBUSER=ochamiuser
+      - SMD_DBPASS=ochamiuser
       - SMD_DBNAME=hmsds
       - SMD_DBOPTS=sslmode=disable
     depends_on:
-      - postgres-smd
+      - postgres
       - smd-init
     ports:
       - '27779:27779'
     networks:
       - bss
       - smd
+  bss-init:
+    hostname: bss-init
+    container_name: bss-init
+    build:
+      context: .
+    environment:
+      - BSS_POSTGRES=true
+      - BSS_INSECURE=true
+      - BSS_DBHOST=postgres
+      - BSS_DBPORT=5432
+      - BSS_DBNAME=bssdb
+      - BSS_DBUSER=ochamiuser
+      - BSS_DBPASS=ochamiuser
+    depends_on:
+      - postgres
+    networks:
+      - bss
+    entrypoint:
+      - /usr/local/bin/bss-init
   bss:
     hostname: bss
     environment:
       - BSS_USESQL=true
       - BSS_INSECURE=true
-      - BSS_DBHOST=postgres-bss
+      - BSS_DBHOST=postgres
       - BSS_DBPORT=5432
       - BSS_DBNAME=bssdb
-      - BSS_DBUSER=bssuser
-      - BSS_DBPASS=bssuser
+      - BSS_DBUSER=ochamiuser
+      - BSS_DBPASS=ochamiuser
     ports:
       - '27778:27778'
     build:
       context: .
     depends_on:
-      - postgres-bss
+      - postgres
+      - bss-init
       - smd
     networks:
       - bss
