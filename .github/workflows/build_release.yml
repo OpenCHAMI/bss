@@ -55,7 +55,7 @@ jobs:
       - name: Attest Binaries
         uses: github-early-access/generate-build-provenance@main
         with:
-          subject-path: dist/bss
+          subject-path: dist/boot-script-service
       - name: generate build provenance
         uses: github-early-access/generate-build-provenance@main
         with:
