@@ -1,0 +1,64 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Release with goreleaser
+
+on:
+  push:
+    tags:
+      - v*
+permissions: write-all # Necessary for creating containers
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Go 1.21
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.21
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: 1
+          fetch-depth: 1
+      - name: Unit Tests
+        run: go test -v ./...
+      - name: Release with goreleaser
+        uses: goreleaser/goreleaser-action@v5
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          version: latest
+          args: release --clean
+        id: goreleaser
+      - name: Process goreleaser output
+        id: process_goreleaser_output
+        run: |
+          echo "const fs = require('fs');" > process.js
+          echo 'const artifacts = ${{ steps.goreleaser.outputs.artifacts }}' >> process.js
+          echo "const firstNonNullDigest = artifacts.find(artifact => artifact.extra && artifact.extra.Digest != null)?.extra.Digest;" >> process.js
+          echo "console.log(firstNonNullDigest);" >> process.js
+          echo "fs.writeFileSync('digest.txt', firstNonNullDigest);" >> process.js
+          node process.js
+          echo "digest=$(cat digest.txt)" >> $GITHUB_OUTPUT
+      - name: Attest Binaries
+        uses: github-early-access/generate-build-provenance@main
+        with:
+          subject-path: dist/bss
+      - name: generate build provenance
+        uses: github-early-access/generate-build-provenance@main
+        with:
+          subject-name: ghcr.io/openchami/ochami-init
+          subject-digest: ${{ steps.process_goreleaser_output.outputs.digest }}
+          push-to-registry: true

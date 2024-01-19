@@ -1,8 +1,0 @@
-name: Run Unit Tests
-on: [push, pull_request, workflow_dispatch]
-jobs:
-  run_unit_test:
-    uses: Cray-HPE/hms-build-image-workflows/.github/workflows/run_unit_test.yaml@v2
-    with:
-      runs-on: ubuntu-latest
-    secrets: inherit
