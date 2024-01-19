@@ -1,10 +1,15 @@
-# Delete a MAC address.
-DELETE http://bss:27778/boot/v1/bootparameters
+# Try to add a duplicate MAC address using upper case. This should not add anything.
+POST http://bss:27778/boot/v1/bootparameters
 {
-	"macs": ["02:0b:b8:00:30:02"]
+	"kernel": "https://testkerneluri0.tld",
+	"initrd": "https://testinitrduri0.tld",
+	"macs": ["02:0B:B8:00:30:04"],
+	"params": "param0"
 }
 
-HTTP 200
+HTTP 400
+[Asserts]
+jsonpath "$.detail" == "Bad Request: postgres.Add: No nodes to add (possible duplicate(s))"
 
 GET http://bss:27778/boot/v1/bootparameters
 
@@ -12,8 +17,9 @@ GET http://bss:27778/boot/v1/bootparameters
 #
 # [
 #	 {
-#		 "hosts": [
+#		 "macs": [
 #			 "02:0b:b8:00:30:00",
+#			 "02:0b:b8:00:30:02",
 #			 "02:0b:b8:00:30:04"
 #		 ],
 #		 "params": "param3,param4",
@@ -36,8 +42,9 @@ GET http://bss:27778/boot/v1/bootparameters
 HTTP 200
 Content-Type: application/json; charset=UTF-8
 [Asserts]
-jsonpath "$[0].macs" count == 2
+jsonpath "$[0].macs" count == 3
 jsonpath "$[0].macs[*]" includes "02:0b:b8:00:30:00"
+jsonpath "$[0].macs[*]" includes "02:0b:b8:00:30:02"
 jsonpath "$[0].macs[*]" includes "02:0b:b8:00:30:04"
 jsonpath "$[0].params" == "param3,param4"
 jsonpath "$[0].kernel" == "https://testkerneluri2.tld"
