@@ -3,6 +3,9 @@
     
     jobs:
       build:
+        defaults:
+          run:
+            working-directory: ./cmd/boot-script-service
         runs-on: ubuntu-latest
     
         steps:
