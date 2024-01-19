@@ -63,10 +63,13 @@ services:
   bss:
     hostname: bss
     environment:
-      - POSTGRES_HOST=postgres-bss
-      - POSTGRES_PORT=5432
-      - SQL_USER=bssuser
-      - SQL_PASSWORD=bssuser
+      - BSS_USESQL=true
+      - BSS_INSECURE=true
+      - BSS_DBHOST=postgres-bss
+      - BSS_DBPORT=5432
+      - BSS_DBNAME=bssdb
+      - BSS_DBUSER=bssuser
+      - BSS_DBPASS=bssuser
     ports:
       - '27778:27778'
     build:

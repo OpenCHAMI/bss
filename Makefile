@@ -21,11 +21,20 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # Service
-NAME ?= cray-bss
+NAME ?= bss
 VERSION ?= $(shell cat .version)
+BINARIES = boot-script-service
 
 
 all : image unittest ct snyk ct_image
+
+binaries: $(BINARIES)
+
+%: cmd/%/*.go
+	GOOS=linux GOARCH=amd64 go build -v -tags musl $(LDFLAGS) -o $@ ./$(dir $<)
+
+clean:
+	rm -f $(BINARIES)
 
 image:
 	docker build ${NO_CACHE} --pull ${DOCKER_ARGS} --tag '${NAME}:${VERSION}' .
@@ -41,3 +50,6 @@ ct:
 
 ct_image:
 	docker build --no-cache -f test/ct/Dockerfile test/ct/ --tag hms-bss-hmth-test:${VERSION}
+
+docker: $(BINARIES)
+	docker build --tag openchami/bss:$(VERSION)-dirty .

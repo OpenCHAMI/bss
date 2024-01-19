@@ -63,8 +63,15 @@ var (
 	datastoreBase = "" // If using ETCD
 	sqlHost       = "localhost"
 	sqlPort       = uint(5432)
+	kvHost        = ""
+	kvPort        = ""
+	kvRetryCount  = kvDefaultRetryCount
+	kvRetryWait   = kvDefaultRetryWait
+	notifierURL   = ""
 	bssdb         postgres.BootDataDatabase
 	bssdbName     = "bssdb"
+	sqlUser       = "bssuser"
+	sqlPass       = "bssuser"
 	hsmBase       = "http://localhost:27779"
 	nfdBase       = "http://localhost:28600"
 	serviceName   = "boot-script-service"
@@ -78,13 +85,16 @@ var (
 	// this well known IP.
 	advertiseAddress  = "" // i.e. http://{IP to reach this service}
 	insecure          = false
-	sqlInsecure       = false
 	debugFlag         = true
 	kvstore           hmetcd.Kvi
 	retryDelay        = uint(30)
 	hsmRetrievalDelay = uint(10)
+	sqlRetryCount     = sqlDefaultRetryCount
+	sqlRetryWait      = sqlDefaultRetryWait
 	notifier          *ScnNotifier
 	useSQL            = false // Use ETCD by default
+	sqlDbOpts         = ""
+	spireServiceURL   = "https://spire-tokens.spire:54440"
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
@@ -129,14 +139,13 @@ func debugf(format string, v ...interface{}) {
 }
 
 func kvDefaultURL() string {
-	eh := os.Getenv("ETCD_HOST")
-	ep := os.Getenv("ETCD_PORT")
 	ret := "mem:"
-	if eh != "" && ep != "" {
-		ret = "http://" + eh + ":" + ep
+	if kvHost != "" && kvPort != "" {
+		ret = "http://" + kvHost + ":" + kvPort
 	}
 	return ret
 }
+
 
 func kvDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
 	retryCount = kvDefaultRetryCount
@@ -211,24 +220,7 @@ func kvOpen(url, opts string, retryCount, retryWait uint64) (err error) {
 	return err
 }
 
-func sqlGetCreds() (user, password string, err error) {
-	err = nil
-	user = os.Getenv("SQL_USER")
-	if user == "" {
-		err = fmt.Errorf("ERROR: unable to get SQL_USER environment variable.")
-		return "", "", err
-	}
-
-	password = os.Getenv("SQL_PASSWORD")
-	if password == "" {
-		err = fmt.Errorf("ERROR: unable to get SQL_PASSWORD environment variable.")
-		return "", "", err
-	}
-
-	return user, password, err
-}
-
-func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount, retryWait uint64) (postgres.BootDataDatabase, error) {
+func sqlOpen(host string, port uint, user, password, extraDbOpts string, ssl bool, retryCount, retryWait uint64) (postgres.BootDataDatabase, error) {
 	var (
 		err  error
 		bddb postgres.BootDataDatabase
@@ -237,7 +229,7 @@ func sqlOpen(host string, port uint, user, password string, ssl bool, retryCount
 
 	for ; ix <= retryCount; ix++ {
 		log.Printf("Attempting connection to Postgres (attempt %d)", ix)
-		bddb, err = postgres.Connect(host, port, user, password, ssl)
+		bddb, err = postgres.Connect(host, port, bssdbName, user, password, ssl, extraDbOpts)
 		if err != nil {
 			log.Printf("ERROR opening opening connection to Postgres (attempt %d): %v\n", ix, err)
 		} else {
@@ -262,69 +254,187 @@ func sqlClose() {
 }
 
 func getNotifierURL() string {
-	var h string
-	parseEnv("BSS_ENDPOINT_HOST", &h)
-	if h == "" {
+	if notifierURL == "" {
 		var err error
-		h, err = os.Hostname()
+		notifierURL, err = os.Hostname()
 		if err == nil {
-			if strings.Contains(h, "cray-bss") {
-				h = "cray-bss"
+			if strings.Contains(notifierURL, "cray-bss") {
+				notifierURL = "cray-bss"
 			} else {
-				h += httpListen
+				notifierURL += httpListen
 			}
 		} else {
 			// If all else fails, use localhost
 			// This may not work for NFD, but things are kind of
 			// messed up anyway if you can't get the hostname.
 			log.Printf("Could not get hostname: %s", err)
-			h = "localhost" + httpListen
+			notifierURL = "localhost" + httpListen
 		}
 	}
-	url := "http://" + h + notifierEndpoint
+	url := "http://" + notifierURL + notifierEndpoint
 	log.Printf("Notification endpoint: %s", url)
 	return url
 }
 
-func main() {
-	insecure := false
-	spireServiceURL := "https://spire-tokens.spire:54440"
+func parseEnvVars() error {
+	var (
+		err      error = nil
+		parseErr error
+		errList  []error
+	)
 
-	// Note: Default for --hsm is somewhat irrelevant since it is explicitly
-	//       specified in the Dockerfile, and can be overridden via
-	//       an environment variable.  Note that the Dockerfile can also be
-	//       over-ridden via helm.
-	// Note: The Default for --datastore is based on the environment variables
-	//       ETCD_HOST and ETCD_PORT, which boot-script-service looks for
-	//       explicitly.  See func kvDefaultURL()
+	//
+	// General BSS environment variables
+	//
 
-	parseEnv("BSS_HTTP_LISTEN", &httpListen)
-	parseEnv("HSM_URL", &hsmBase)
-	parseEnv("NFD_URL", &nfdBase)
-	parseEnv("DATASTORE_BASE", &datastoreBase)
-	parseEnv("BSS_INSECURE", &insecure)
-	parseEnv("BSS_DEBUG", &debugFlag)
-	parseEnv("BSS_RETRY_DELAY", &retryDelay)
-	parseEnv("BSS_RETRIEVAL_DELAY", &hsmRetrievalDelay)
-	parseEnv("SPIRE_TOKEN_URL", &spireServiceURL)
-	parseEnv("BSS_ADVERTISE_ADDRESS", &advertiseAddress)
+	parseErr = parseEnv("BSS_SERVICE_NAME", &serviceName)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_SERVICE_NAME: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_HTTP_LISTEN", &httpListen)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_HTTP_LISTEN: %q", parseErr))
+	}
+	parseErr = parseEnv("HSM_URL", &hsmBase)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("HSM_URL: %q", parseErr))
+	}
+	parseErr = parseEnv("NFD_URL", &nfdBase)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("NFD_URL: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_ADVERTISE_ADDRESS", &advertiseAddress)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_ADVERTISE_ADDRESS: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_RETRY_DELAY", &retryDelay)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_RETRY_DELAY: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_HSM_RETRIEVAL_DELAY", &hsmRetrievalDelay)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_HSM_RETRIEVAL_DELAY: %q", parseErr))
+	}
+	parseErr = parseEnv("SPIRE_TOKEN_URL", &spireServiceURL)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("SPIRE_TOKEN_URL: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_ENDPOINT_HOST", &notifierURL)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_ENDPOINT_HOST: %q", parseErr))
+	}
 
-	flag.StringVar(&httpListen, "http-listen", httpListen, "HTTP server IP + port binding")
-	flag.StringVar(&hsmBase, "hsm", hsmBase, "Hardware State Manager location as URI, e.g. [scheme]://[host[:port]]")
-	flag.StringVar(&nfdBase, "nfd", nfdBase, "Notification daemon location as URI, e.g. [scheme]://[host[:port]]")
-	flag.StringVar(&datastoreBase, "datastore", kvDefaultURL(), "Datastore Service location as URI")
-	flag.StringVar(&sqlHost, "postgres-host", sqlHost, "Postgres host as IP address or name")
-	flag.StringVar(&serviceName, "service-name", serviceName, "Boot script service name")
-	flag.StringVar(&spireTokensBaseURL, "spire-url", spireServiceURL, "Spire join token service base URL")
-	flag.StringVar(&advertiseAddress, "cloud-init-address", advertiseAddress, "IP:PORT to advertise for cloud-init calls. This needs to be an IP as we do not have DNS when cloud-init runs")
-	flag.BoolVar(&insecure, "insecure", insecure, "Don't enforce https certificate security")
-	flag.BoolVar(&sqlInsecure, "postgres-insecure", sqlInsecure, "Don't enforce certificate authority for Postgres")
-	flag.BoolVar(&debugFlag, "debug", debugFlag, "Enable debug output")
-	flag.BoolVar(&useSQL, "postgres", useSQL, "Use Postgres instead of ETCD")
-	flag.UintVar(&retryDelay, "retry-delay", retryDelay, "Retry delay in seconds")
-	flag.UintVar(&hsmRetrievalDelay, "hsm-retrieval-delay", hsmRetrievalDelay, "SM Retrieval delay in seconds")
-	flag.UintVar(&sqlPort, "postgres-port", sqlPort, "Postgres port")
+	//
+	// Etcd environment variables
+	//
+
+	parseErr = parseEnv("DATASTORE_BASE", &datastoreBase)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("DATASTORE_BASE: %q", parseErr))
+	}
+	parseErr = parseEnv("ETCD_HOST", &kvHost)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("ETCD_HOST: %q", parseErr))
+	}
+	parseErr = parseEnv("ETCD_PORT", &kvPort)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("ETCD_PORT: %q", parseErr))
+	}
+	parseErr = parseEnv("ETCD_RETRY_COUNT", &kvRetryCount)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("ETCD_RETRY_COUNT: %q", parseErr))
+	}
+	parseErr = parseEnv("ETCD_RETRY_WAIT", &kvRetryWait)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("ETCD_RETRY_WAIT: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_INSECURE", &insecure)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_INSECURE: %q", parseErr))
+	}
+
+	//
+	// SQL environment variables
+	//
+
+	parseErr = parseEnv("BSS_USESQL", &useSQL)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_USESQL: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_DEBUG", &debugFlag)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_DEBUG: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_DBHOST", &sqlHost)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_DBHOST: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_DBPORT", &sqlPort)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_DBPORT: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_DBNAME", &bssdbName)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_DBNAME: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_DBOPTS", &sqlDbOpts)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_DBOPTS: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_DBUSER", &sqlUser)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_DBUSER: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_DBPASS", &sqlPass)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_DBPASS: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_SQL_RETRY_COUNT", &sqlRetryCount)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_SQL_RETRY_COUNT: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_SQL_RETRY_WAIT", &sqlRetryWait)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_SQL_RETRY_WAIT: %q", parseErr))
+	}
+
+	if len(errList) > 0 {
+		err = fmt.Errorf("Error(s) parsing environment variables: %v", errList)
+	}
+
+	return err
+}
+
+func parseCmdLine() {
+	flag.StringVar(&httpListen, "http-listen", httpListen, "(BSS_HTTP_LISTEN) HTTP server IP + port binding")
+	flag.StringVar(&hsmBase, "hsm", hsmBase, "(HSM_URL) Hardware State Manager location as URI, e.g. [scheme]://[host[:port]]")
+	flag.StringVar(&nfdBase, "nfd", nfdBase, "(NFD_URL) Notification daemon location as URI, e.g. [scheme]://[host[:port]]")
+	flag.StringVar(&datastoreBase, "datastore", kvDefaultURL(), "(DATASTORE_BASE) Datastore Service location as URI")
+	flag.StringVar(&sqlHost, "postgres-host", sqlHost, "(BSS_DBHOST) Postgres host as IP address or name")
+	flag.StringVar(&serviceName, "service-name", serviceName, "(BSS_SERVICE_NAME) Boot script service name")
+	flag.StringVar(&spireTokensBaseURL, "spire-url", spireServiceURL, "(SPIRE_TOKEN_URL) Spire join token service base URL")
+	flag.StringVar(&advertiseAddress, "cloud-init-address", advertiseAddress, "(BSS_ADVERTISE_ADDRESS) IP:PORT to advertise for cloud-init calls. This needs to be an IP as we do not have DNS when cloud-init runs")
+	flag.StringVar(&bssdbName, "postgres-dbname", bssdbName, "(BSS_DBNAME) Postgres database name")
+	flag.StringVar(&sqlUser, "postgres-username", sqlUser, "(BSS_DBUSER) Postgres username")
+	flag.StringVar(&sqlPass, "postgres-password", sqlPass, "(BSS_DBPASS) Postgres password")
+	flag.BoolVar(&insecure, "insecure", insecure, "(BSS_INSECURE) Don't enforce https certificate security")
+	flag.BoolVar(&debugFlag, "debug", debugFlag, "(BSS_DEBUG) Enable debug output")
+	flag.BoolVar(&useSQL, "postgres", useSQL, "(BSS_USESQL) Use Postgres instead of ETCD")
+	flag.UintVar(&retryDelay, "retry-delay", retryDelay, "(BSS_RETRY_DELAY) Retry delay in seconds")
+	flag.UintVar(&hsmRetrievalDelay, "hsm-retrieval-delay", hsmRetrievalDelay, "(BSS_HSM_RETRIEVAL_DELAY) SM Retrieval delay in seconds")
+	flag.UintVar(&sqlPort, "postgres-port", sqlPort, "(BSS_DBPORT) Postgres port")
+	flag.Uint64Var(&sqlRetryCount, "postgres-retry-count", sqlRetryCount, "(BSS_SQL_RETRY_COUNT) Amount of times to retry connecting to Postgres")
+	flag.Uint64Var(&sqlRetryWait, "postgres-retry-wait", sqlRetryCount, "(BSS_SQL_RETRY_WAIT) Interval in seconds between connection attempts to Postgres")
 	flag.Parse()
+}
+
+func main() {
+	err := parseEnvVars()
+	if err != nil {
+		log.Println(err)
+		log.Println("WARNING: Ignoring environment variables with errors.")
+	}
+	parseCmdLine()
 
 	sn, snerr := base.GetServiceInstanceName()
 	if snerr == nil {
@@ -345,7 +455,7 @@ func main() {
 		log.Fatalf("--cloud-init-address or BSS_ADVERTISE_ADDRESS required.")
 	}
 
-	err := SmOpen(hsmBase, svcOpts)
+	err = SmOpen(hsmBase, svcOpts)
 	if err != nil {
 		log.Fatalf("Access to SM service %s failed: %v\n", hsmBase, err)
 	}
@@ -354,21 +464,11 @@ func main() {
 
 	// If --postgres passed, use Postgres. Otherwise, use Etcd.
 	if useSQL {
-		sqlRetryCount, sqlRetryWait, err := sqlDefaultRetryConfig()
-		if err != nil {
-			log.Println("WARNING: getting retry config failed: ", err)
-			log.Printf("WARNING: using default retry config: SQL_RETRY_COUNT=%d SQL_RETRY_WAIT=%d\n", sqlRetryCount, sqlRetryWait)
-		}
-
-		var sqlUser, sqlPassword string
-		sqlUser, sqlPassword, err = sqlGetCreds()
-		if err != nil {
-			log.Fatalf("ERROR: could not get Postgres credentials: %v\n", err)
-		}
+		log.Printf("sqlRetryCount=%d sqlRetryWait=%ds", sqlRetryCount, sqlRetryWait)
 
 		// Initiate connection to Postgres.
-		log.Printf("Using insecure connection to SQL database: %v\n", sqlInsecure)
-		bssdb, err = sqlOpen(sqlHost, sqlPort, sqlUser, sqlPassword, !sqlInsecure, sqlRetryCount, sqlRetryWait)
+		log.Printf("Using insecure connection to SQL database: %v\n", insecure)
+		bssdb, err = sqlOpen(sqlHost, sqlPort, sqlUser, sqlPass, sqlDbOpts, !insecure, sqlRetryCount, sqlRetryWait)
 		if err != nil {
 			log.Fatalf("Access to Postgres database at %s:%d failed: %v\n", sqlHost, sqlPort, err)
 		}
@@ -380,12 +480,7 @@ func main() {
 			log.Fatalf("Creating Postgres database %q and tables failed: %v\n", bssdbName, err)
 		}
 	} else {
-		kvRetyCount, kvRetryWait, err := kvDefaultRetryConfig()
-		if err != nil {
-			log.Fatal("Unable to parse ETCD default")
-		}
-
-		err = kvOpen(datastoreBase, svcOpts, kvRetyCount, kvRetryWait)
+		err = kvOpen(datastoreBase, svcOpts, kvRetryCount, kvRetryWait)
 		if err != nil {
 			log.Fatalf("Access to Datastore service %s with name %s failed: %v\n", datastoreBase, serviceName, err)
 		}
