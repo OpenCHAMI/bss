@@ -59,6 +59,6 @@ jobs:
       - name: generate build provenance
         uses: github-early-access/generate-build-provenance@main
         with:
-          subject-name: ghcr.io/openchami/ochami-init
+          subject-name: ghcr.io/openchami/bss
           subject-digest: ${{ steps.process_goreleaser_output.outputs.digest }}
           push-to-registry: true
