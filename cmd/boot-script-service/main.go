@@ -173,7 +173,7 @@ func sqlDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
 	if envRetryCount != "" {
 		retryCount, err = strconv.ParseUint(envRetryCount, 10, 64)
 		if err != nil {
-			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_COUNT environment variable: ", err)
+			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_COUNT environment variable: %v", err)
 			return kvDefaultRetryCount, kvDefaultRetryWait, err
 		}
 	}
@@ -182,7 +182,7 @@ func sqlDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
 	if envRetryWait != "" {
 		retryWait, err = strconv.ParseUint(envRetryWait, 10, 64)
 		if err != nil {
-			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_WAIT environment variable: ", err)
+			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_WAIT environment variable: %v", err)
 			return kvDefaultRetryWait, kvDefaultRetryWait, err
 		}
 	}
