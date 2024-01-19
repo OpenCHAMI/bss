@@ -49,6 +49,13 @@ type BootDataDatabase struct {
 	//ImageCache map[string]Image
 }
 
+// A helper struct to have a boot group and its corresponding
+// boot config in the same place.
+type bgbc struct {
+	Bg BootGroup
+	Bc BootConfig
+}
+
 // makeKey creates a key from a key and subkey.  If key is not empty, it will
 // be prepended with a '/' if it does not already start with one.  If subkey is
 // not empty, it will be appended with a '/' if it does not already end with
@@ -221,6 +228,30 @@ func (bddb BootDataDatabase) addBootGroupAssignments(bga []BootGroupAssignment) 
 	return err
 }
 
+// updateNodeAssignment updates the boot group assignment(s) of one or more nodes to a different
+// boot group (and thus, a different boot config).
+func (bddb BootDataDatabase) updateNodeAssignment(nodeIds []string, bgId string) (err error) {
+	if len(nodeIds) == 0 {
+		err = fmt.Errorf("No node IDs specified")
+		return err
+	}
+	if len(bgId) == 0 {
+		err = fmt.Errorf("No boot group ID specified")
+		return err
+	}
+
+	execStr := `UPDATE boot_group_assignments bga SET boot_group_id = $1` +
+		` WHERE node_id IN ` + stringSliceToSql(nodeIds) +
+		`;`
+	_, err = bddb.DB.Exec(execStr, bgId)
+	if err != nil {
+		err = fmt.Errorf("Error executing update on boot group assignments: %v", err)
+		return err
+	}
+
+	return err
+}
+
 // GetNodes returns a list of all nodes in the nodes table within bddb.
 func (bddb BootDataDatabase) GetNodes() ([]Node, error) {
 	nodeList := []Node{}
@@ -248,6 +279,56 @@ func (bddb BootDataDatabase) GetNodes() ([]Node, error) {
 	}
 
 	return nodeList, err
+}
+
+// CheckNodeExistence takes takes a slice of MAC addresses, a slice of XNames, and a slice of NIDs
+// and checks to see if the nodes corresponding to them exist in the nodes table. Those that do
+// exist are added to an existing Node slice. MAC addresses, XNames, and NIDs that do not correspond
+// to any existing nodes are added to a corresponding slice of non-existing MACs/XNames/NIDs. The
+// slices of existing nodes, nonexisting MAC addresses, nonexisting XNames, and nonexisting NIDs are
+// returned. If an error occurs when querying the database, it is returned.
+func (bddb BootDataDatabase) CheckNodeExistence(macs, xnames []string, nids []int32) (existingNodes []Node, nonExistingMacs, nonExistingXnames []string, nonExistingNids []int32, err error) {
+	// Get nodes that exist.
+	existingNodes, err = bddb.GetNodesByItems(macs, xnames, nids)
+	if err != nil {
+		err = fmt.Errorf("Error checking node existence for macs=%v xnames=%v nids=%v: %v", macs, xnames, nids, err)
+		return existingNodes, nonExistingMacs, nonExistingXnames, nonExistingNids, err
+	}
+
+	// Create three maps:
+	//   1. mac -> Node
+	//   2. xname -> Node
+	//   3. nid -> Node
+	// Iterate through each Node in the existing node list and add each's mac/xname/nid
+	// to the corresponding map. These will be used to determine whether macs/xnames/nids
+	// that were passed exist or not.
+	macToNode := make(map[string]Node)
+	xnameToNode := make(map[string]Node)
+	nidToNode := make(map[int32]Node)
+	for _, n := range existingNodes {
+		macToNode[n.BootMac] = n
+		xnameToNode[n.Xname] = n
+		nidToNode[n.Nid] = n
+	}
+
+	// Iterate through each slice of mac/xname/nid and categorize each's existence.
+	for _, m := range macs {
+		if _, ok := macToNode[m]; !ok {
+			nonExistingMacs = append(nonExistingMacs, m)
+		}
+	}
+	for _, x := range xnames {
+		if _, ok := xnameToNode[x]; !ok {
+			nonExistingXnames = append(nonExistingXnames, x)
+		}
+	}
+	for _, n := range nids {
+		if _, ok := nidToNode[n]; !ok {
+			nonExistingNids = append(nonExistingNids, n)
+		}
+	}
+
+	return existingNodes, nonExistingMacs, nonExistingXnames, nonExistingNids, err
 }
 
 // GetNodesByItems queries the nodes table for any Nodes that has an XName, MAC address, or NID that
@@ -469,6 +550,157 @@ func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline
 	}
 
 	return bgResults, bcResults, numResults, err
+}
+
+// Obtain a map of nodes mapping to their corresponding boot group and boot config.
+func (bddb BootDataDatabase) getNodesWithConfigs(macs, xnames []string, nids []int32) (map[Node]bgbc, error) {
+	var err error
+	nToBgbc := make(map[Node]bgbc)
+	qstr := `SELECT n.id, n.boot_mac, n.xname, n.nid,` +
+		` bg.id, bg.name, bg.description,` +
+		` bc.id, bc.kernel_uri, bc.initrd_uri, bc.cmdline` +
+		` FROM nodes AS n` +
+		` JOIN boot_group_assignments AS bga ON n.id=bga.node_id` +
+		` JOIN boot_groups AS bg ON bga.boot_group_id=bg.id` +
+		` JOIN boot_configs AS bc ON bg.boot_config_id=bc.id` +
+		` WHERE`
+	lengths := []int{len(macs), len(xnames), len(nids)}
+	for first, i := true, 0; i < len(lengths); i++ {
+		if lengths[i] > 0 {
+			if !first {
+				qstr += ` OR`
+			}
+			switch i {
+			case 0:
+				qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macs))
+			case 1:
+				qstr += fmt.Sprintf(` xname IN %s`, stringSliceToSql(xnames))
+			case 2:
+				qstr += fmt.Sprintf(` nid IN %s`, int32SliceToSql(nids))
+			}
+			first = false
+		}
+	}
+	qstr += `;`
+
+	var rows *sql.Rows
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not query nodes with boot configs: %v", err)
+		return nToBgbc, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			n   Node
+			cfg bgbc
+		)
+		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid,
+			&cfg.Bg.Id, &cfg.Bg.Name, &cfg.Bg.Description,
+			&cfg.Bc.Id, &cfg.Bc.KernelUri, &cfg.Bc.InitrdUri, &cfg.Bc.Cmdline)
+		if err != nil {
+			err = fmt.Errorf("Could not scan query results: %v", err)
+			return nToBgbc, err
+		}
+		cfg.Bg.BootConfigId = cfg.Bc.Id
+
+		nToBgbc[n] = cfg
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Error parsing query results: %v", err)
+		return nToBgbc, err
+	}
+
+	return nToBgbc, err
+}
+
+// Obtain a map of boot groups and boot configs mapping to the list of nodes they correspond to.
+func (bddb BootDataDatabase) getConfigsWithNodes(nodeIds []string) (map[bgbc][]Node, error) {
+	var err error
+	bgbcToN := make(map[bgbc][]Node)
+
+	if len(nodeIds) == 0 {
+		err = fmt.Errorf("No node IDs specified")
+		return bgbcToN, err
+	}
+
+	qstr := `SELECT bg.id FROM boot_groups AS bg` +
+		` JOIN boot_group_assignments AS bga ON bg.id=bga.boot_group_id` +
+		` WHERE bga.node_id IN ` + stringSliceToSql(nodeIds) +
+		`;`
+
+	var rows *sql.Rows
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not query boot configs and groups from node IDs: %v", err)
+		return bgbcToN, err
+	}
+	defer rows.Close()
+
+	var bgIds []string
+	for rows.Next() {
+		var bgId string
+		err = rows.Scan(&bgId)
+		if err != nil {
+			err = fmt.Errorf("Could not scan query results: %v", err)
+			return bgbcToN, err
+		}
+
+		bgIds = append(bgIds, bgId)
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Error parsing query results: %v", err)
+		return bgbcToN, err
+	}
+	rows.Close()
+
+	qstr = `SELECT bg.id, bg.name, bg.description,` +
+		` bc.id, bc.kernel_uri, bc.initrd_uri, bc.cmdline,` +
+		` n.id, n.boot_mac, n.xname, n.nid` +
+		` FROM boot_groups AS bg` +
+		` JOIN boot_configs AS bc ON bg.boot_config_id=bc.id` +
+		` JOIN boot_group_assignments AS bga ON bg.id=bga.boot_group_id` +
+		` JOIN nodes AS n ON bga.node_id=n.id` +
+		` WHERE bg.id IN ` + stringSliceToSql(bgIds) +
+		`;`
+
+	rows, err = bddb.DB.Query(qstr)
+	if err != nil {
+		err = fmt.Errorf("Could not query boot configs with nodes: %v", err)
+		return bgbcToN, err
+	}
+
+	for rows.Next() {
+		var (
+			cfg bgbc
+			n   Node
+		)
+		err = rows.Scan(&cfg.Bg.Id, &cfg.Bg.Name, &cfg.Bg.Description,
+			&cfg.Bc.Id, &cfg.Bc.KernelUri, &cfg.Bc.InitrdUri, &cfg.Bc.Cmdline,
+			&n.Id, &n.BootMac, &n.Xname, &n.Nid)
+		if err != nil {
+			err = fmt.Errorf("Could not scan query results: %v", err)
+			return bgbcToN, err
+		}
+		cfg.Bg.BootConfigId = cfg.Bc.Id
+
+		if tmpNodeList, ok := bgbcToN[cfg]; !ok {
+			bgbcToN[cfg] = []Node{n}
+		} else {
+			tmpNodeList = append(tmpNodeList, n)
+			bgbcToN[cfg] = tmpNodeList
+		}
+	}
+	// Did a rows.Next() return an error?
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("Error parsing query results: %v", err)
+		return bgbcToN, err
+	}
+
+	return bgbcToN, err
 }
 
 func stringSliceToSql(ss []string) string {
@@ -1550,8 +1782,263 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 	return nodesDeleted, bcsDeleted, err
 }
 
-func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (err error) {
-	return nil
+// Update modifies the boot parameters (and, optionally, the kernel and/or initramfs URI) of one or
+// more existing nodes, specified by node ID, XName, or MAC address. If any of the passed nodes does
+// not exist in the database, the operation aborts and an error is returned. A slice of strings is
+// returned containing the node IDs of nodes whose values were updated.
+func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []string, err error) {
+	// Make sure all macs/xnames/nids passed exist; err if any do not.
+	var (
+		missingMacs   []string
+		missingXnames []string
+		missingNids   []int32
+	)
+	_, missingMacs, missingXnames, missingNids, err = bddb.CheckNodeExistence(bp.Macs, bp.Hosts, bp.Nids)
+	if err != nil {
+		err = fmt.Errorf("postgres.Update: %v", err)
+		return nodesUpdated, err
+	} else if len(missingMacs) > 0 || len(missingXnames) > 0 || len(missingNids) > 0 {
+		err = fmt.Errorf("postgres.Update: Nodes do not exist in nodes table: macs=%v xnames=%v nids=%v", missingMacs, missingXnames, missingNids)
+		return nodesUpdated, err
+	}
+
+	// Make sure the new content isn't blank.
+	lenParams := len(bp.Params)
+	lenKernUri := len(bp.Kernel)
+	lenInitrdUri := len(bp.Initrd)
+	if lenParams == 0 && lenKernUri == 0 && lenInitrdUri == 0 {
+		err = fmt.Errorf("postgres.Update: Must specify at least one of params, kernel, or initrd")
+		return nodesUpdated, err
+	}
+
+	// Get requested nodes with their corresponding boot group and boot config.
+	//
+	// This is to keep track if which nodes need updating without duplicates (hence the map).
+	// The value doesn't really matter here, since this map is used to check node existence.
+	var nToBgbc map[Node]bgbc
+	nToBgbc, err = bddb.getNodesWithConfigs(bp.Macs, bp.Hosts, bp.Nids)
+	if err != nil {
+		err = fmt.Errorf("postgres.Update: %v", err)
+		return nodesUpdated, err
+	}
+
+	// Put node IDs from map above into slice for next step.
+	nodeIds := make([]string, len(nToBgbc))
+	idx := 0
+	for n := range nToBgbc {
+		nodeIds[idx] = n.Id
+		idx++
+	}
+
+	// Get boot groups and boot configs that need updating with their corresponding node list.
+	//
+	// This is to keep track of which boot configs/groups can be deleted (so the new
+	// config/group can be created or set, if it already exists) and which cannot (i.e. other
+	// nodes not being updated depend on it. Nodes in this map are compared to nodes in nToBgbc
+	// above to determine ig a boot config/group can be deleted.
+	var bgbcToN map[bgbc][]Node
+	bgbcToN, err = bddb.getConfigsWithNodes(nodeIds)
+	if err != nil {
+		err = fmt.Errorf("postgres.Update: %v", err)
+		return nodesUpdated, err
+	}
+
+	// Query for boot configs/groups that have a similar config to that passed.
+	//
+	// This is to make sure a duplicate boot config/group is added. When the boot configs/groups
+	// are created for the nodes later (since the passed config is only partial), we compare
+	// them to configs in this map and do not add it to the database if it already exists.
+	var (
+		sBcs    []BootConfig
+		sBgs    []BootGroup
+		lenSBcs int
+	)
+	similarBcs := make(map[BootConfig]BootGroup)
+	sBgs, sBcs, lenSBcs, err = bddb.GetBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
+	if err != nil {
+		err = fmt.Errorf("postgres.Update: %v", err)
+		return nodesUpdated, err
+	}
+	for i := 0; i < lenSBcs; i++ {
+		sBcNoId := sBcs[i]
+		sBcNoId.Id = "" // Blank out ID so comparison depends only on the config.
+		similarBcs[sBcNoId] = sBgs[i]
+	}
+
+	// Determine boot configs/groups that need to be created, deleted, or left alone.
+	//
+	// Here, we have bgbcToN, which stores the boot configs/groups that correspond with nodes
+	// that were specified mapped to _all_ of the nodes that each boot confnig/group corresponds
+	// with. We also have nToBgbc, which stores each node that was specified mapped to the boot
+	// config/group it corresponds with. We compare data between the two to determine which boot
+	// configs/groups we can delete (no more nodes depend on it) and which we cannot (other
+	// nodes still depend on it). We then generate the new config based on the old data and the
+	// newly-passed data and compare it to any existing groups/configs. If this config already
+	// exists, the nodes are pointed to the existing configs. Else, the new group/config is
+	// added to the database and the nodes are pointed to the newly-created group/config.
+
+	var bgbcToDel []bgbc                        // List of old boot configs/groups that can be deleted.
+	bgbcToAdd := make(map[bgbc][]Node)          // Map of new boot configs/groups to be added, with their nodes.
+	existingBgbcToNode := make(map[bgbc][]Node) // Map of existing boot configs/groups with their nodes.
+
+	// Iterate through the list of boot configs/groups that relate to the nodes that were
+	// passed.
+	for ncfg, nList := range bgbcToN {
+		// Determine which of the old boot configs/groups can be deleted.
+		//
+		// We will delete any old boot configs/groups that don't have any additional nodes
+		// depending on them.
+		delBgbc := true
+		for _, n := range nList {
+			if _, ok := nToBgbc[n]; !ok {
+				delBgbc = false
+				break
+			}
+		}
+		if delBgbc {
+			bgbcToDel = append(bgbcToDel, ncfg)
+		}
+
+		// Create the new boot config/group for these nodes.
+		//
+		// The way we are "updating" is by:
+		//
+		// 1. copying the old group/config to a new one,
+		// 2. updating the copy,
+		// 3. deleting the old group/config, and
+		// 4. pointing the nodes to the new group/config.
+		//
+		// However, a new group/config is only added to the database if an identical one
+		// (sans ID) exists. If that is the case, Steps 1-2 are deleted and Step 4 becomes
+		// "pointing the nodes to the existing group/config".
+		var newBgbc bgbc
+		newKernel := ncfg.Bc.KernelUri
+		newInitrd := ncfg.Bc.InitrdUri
+		newParams := ncfg.Bc.Cmdline
+		if bp.Kernel != "" {
+			newKernel = bp.Kernel
+		}
+		if bp.Initrd != "" {
+			newInitrd = bp.Initrd
+		}
+		if bp.Params != "" {
+			newParams = bp.Params
+		}
+		newBgName := fmt.Sprintf("BootGroup(kernel=%q,initrd=%q,params=%q)", newKernel, newInitrd, newParams)
+		newBgDesc := fmt.Sprintf("Boot group for nodes with kernel=%q initrd=%q params=%q", newKernel, newInitrd, newParams)
+		newBgbc.Bc, err = NewBootConfig(newKernel, newInitrd, newParams)
+		if err != nil {
+			err = fmt.Errorf("postgres.Update: Could not create new BootConfig: %v", err)
+			return nodesUpdated, err
+		}
+		newBgbc.Bg = NewBootGroup(newBgbc.Bc.Id, newBgName, newBgDesc)
+
+		// Check if an identical boot group/config already exists. If so, add the existing
+		// config with its node list to existingBgbcToNode so we know not to create it
+		// again. Otherwise, add it to bgbcToAdd with its node list so it will be created.
+		newBcNoId := newBgbc.Bc
+		newBcNoId.Id = "" // Blank out the ID so only the config will match.
+		if tmpSimilarBg, ok := similarBcs[newBcNoId]; ok &&
+			// If the config matches an existing one and the name/description matches the ones
+			// we created (i.e. it is not a named group), then add it to the existing boot
+			// group/config list.
+			(tmpSimilarBg.Name == newBgName && tmpSimilarBg.Description == newBgDesc) {
+			var sBgbc bgbc
+			sBgbc.Bc = newBgbc.Bc
+			sBgbc.Bg = tmpSimilarBg
+			for _, n := range nList {
+				// Only if the node is in the list of ones passed will it be
+				// updated.
+				if _, ok := nToBgbc[n]; ok {
+					if tmpNodeList, ok := existingBgbcToNode[sBgbc]; !ok {
+						existingBgbcToNode[sBgbc] = []Node{n}
+					} else {
+						tmpNodeList = append(tmpNodeList, n)
+						existingBgbcToNode[sBgbc] = tmpNodeList
+					}
+				}
+			}
+		} else {
+			// If the config doesn't match any existing ones or any existing ones are for a
+			// named group, then add it to the list of groups/configs that will be created.
+			for _, n := range nList {
+				// Only if the node is in the list of ones passed will it be
+				// updated.
+				if _, ok := nToBgbc[n]; ok {
+					if tmpNodeList, ok := bgbcToAdd[newBgbc]; !ok {
+						bgbcToAdd[newBgbc] = []Node{n}
+					} else {
+						tmpNodeList = append(tmpNodeList, n)
+						bgbcToAdd[newBgbc] = tmpNodeList
+					}
+				}
+			}
+		}
+	}
+
+	// Delete boot configs/groups marked for deletion.
+	bcIds := []string{}
+	for _, bgbc := range bgbcToDel {
+		bcIds = append(bcIds, bgbc.Bc.Id)
+	}
+	execStr := `DELETE FROM boot_configs bc USING boot_groups bg` +
+		` WHERE bg.boot_config_id=bc.id AND bc.id IN ` + stringSliceToSql(bcIds) +
+		`;`
+	execStr += ` DELETE FROM boot_groups bg WHERE bg.boot_config_id IN ` + stringSliceToSql(bcIds) + `;`
+	_, err = bddb.DB.Exec(execStr)
+	if err != nil {
+		err = fmt.Errorf("postgres.Update: Could not perform boot group/config deletion: %v", err)
+		return nodesUpdated, err
+	}
+
+	// Add boot configs/groups marked for addition.
+	bcList := []BootConfig{}
+	bgList := []BootGroup{}
+	for bgbc := range bgbcToAdd {
+		bcList = append(bcList, bgbc.Bc)
+		bgList = append(bgList, bgbc.Bg)
+	}
+	err = bddb.addBootConfigs(bcList)
+	if err != nil {
+		err = fmt.Errorf("postgres.Update: Could not add boot config(s): %v", err)
+		return nodesUpdated, err
+	}
+	err = bddb.addBootGroups(bgList)
+	if err != nil {
+		err = fmt.Errorf("postgres.Update: Could not add boot group(s): %v", err)
+		return nodesUpdated, err
+	}
+
+	// Modify node boot group assignments to reflect update for new boot groups/configs.
+	for bgbc, nodeList := range bgbcToAdd {
+		nodeIds := make([]string, len(nodeList))
+		for i := range nodeList {
+			nodeIds[i] = nodeList[i].Id
+		}
+		err = bddb.updateNodeAssignment(nodeIds, bgbc.Bg.Id)
+		if err != nil {
+			err = fmt.Errorf("postgres.Update: Could not update boot group assignments for nodes=%v: %v", nodeList, err)
+			return nodesUpdated, err
+		}
+
+		nodesUpdated = append(nodesUpdated, nodeIds...)
+	}
+	// Modify node boot group assignments to reflect update for existing boot groups/configs.
+	for bgbc, nodeList := range existingBgbcToNode {
+		nodeIds := make([]string, len(nodeList))
+		for i := range nodeList {
+			nodeIds[i] = nodeList[i].Id
+		}
+		err = bddb.updateNodeAssignment(nodeIds, bgbc.Bg.Id)
+		if err != nil {
+			err = fmt.Errorf("postgres.Update: Could not update boot group assignments for nodes=%v: %v", nodeList, err)
+			return nodesUpdated, err
+		}
+
+		nodesUpdated = append(nodesUpdated, nodeIds...)
+	}
+
+	return nodesUpdated, err
 }
 
 // GetBootParamsAll returns a slice of bssTypes.BootParams that contains all of the boot
