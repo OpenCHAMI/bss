@@ -146,6 +146,59 @@ func kvDefaultURL() string {
 	return ret
 }
 
+
+func kvDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
+	retryCount = kvDefaultRetryCount
+	retryWait = kvDefaultRetryWait
+
+	envRetryCount := os.Getenv("ETCD_RETRY_COUNT")
+	if envRetryCount != "" {
+		retryCount, err = strconv.ParseUint(envRetryCount, 10, 64)
+		if err != nil {
+			log.Println("ERROR enable to parse ETCD_RETRY_COUNT environment variable: ", err)
+			return kvDefaultRetryCount, kvDefaultRetryWait, err
+		}
+	}
+
+	envRetryWait := os.Getenv("ETCD_RETRY_WAIT")
+	if envRetryWait != "" {
+		retryWait, err = strconv.ParseUint(envRetryWait, 10, 64)
+		if err != nil {
+			log.Println("ERROR enable to parse ETCD_RETRY_WAIT environment variable: ", err)
+			return kvDefaultRetryCount, kvDefaultRetryWait, err
+		}
+	}
+
+	return retryCount, retryWait, nil
+}
+
+// Try to read SQL_RETRY_COUNT and SQL_RETRY_WAIT environment variables.
+// If either variable contains an invalid value, return the default values of both.
+func sqlDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
+	retryCount = sqlDefaultRetryCount
+	retryWait = sqlDefaultRetryWait
+
+	envRetryCount := os.Getenv("SQL_RETRY_COUNT")
+	if envRetryCount != "" {
+		retryCount, err = strconv.ParseUint(envRetryCount, 10, 64)
+		if err != nil {
+			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_COUNT environment variable: %v", err)
+			return kvDefaultRetryCount, kvDefaultRetryWait, err
+		}
+	}
+
+	envRetryWait := os.Getenv("SQL_RETRY_WAIT")
+	if envRetryWait != "" {
+		retryWait, err = strconv.ParseUint(envRetryWait, 10, 64)
+		if err != nil {
+			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_WAIT environment variable: %v", err)
+			return kvDefaultRetryWait, kvDefaultRetryWait, err
+		}
+	}
+
+	return retryCount, retryWait, nil
+}
+
 func kvOpen(url, opts string, retryCount, retryWait uint64) (err error) {
 	ix := uint64(1)
 	for ; ix <= retryCount; ix++ {

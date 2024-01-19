@@ -1,0 +1,21 @@
+    name: Run Unit Tests
+    on: [push, pull_request]
+    
+    jobs:
+      build:
+        defaults:
+          run:
+            working-directory: ./cmd/boot-script-service
+        runs-on: ubuntu-latest
+    
+        steps:
+          - uses: actions/checkout@v4
+          - name: Setup Go
+            uses: actions/setup-go@v4
+            with:
+              go-version: '1.21.x'
+          - name: Install dependencies
+            run: go get .
+          - name: Test with the Go CLI
+            run: go test
+    
