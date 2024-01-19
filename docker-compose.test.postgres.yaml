@@ -29,7 +29,7 @@ services:
       - smd
   smd-init:
     hostname: smd-init
-    image: bikeshack/smd:v2.12.11-ochami
+    image: ghcr.io/openchami/smd:v2.13.5
     environment:
       - SMD_DBHOST=postgres-smd
       - SMD_DBPORT=5432
@@ -44,7 +44,7 @@ services:
     command: ["/smd-init"]
   smd:
     hostname: smd
-    image: bikeshack/smd:v2.12.11-ochami
+    image: ghcr.io/openchami/smd:v2.13.5
     environment:
       - SMD_DBHOST=postgres-smd
       - SMD_DBPORT=5432
