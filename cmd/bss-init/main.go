@@ -157,6 +157,14 @@ func parseEnvVars() error {
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_FRESH: %q", parseErr))
 	}
+	parseErr = parseEnv("BSS_SQL_RETRY_WAIT", &sqlRetryInterval)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_SQL_RETRY_WAIT: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_SQL_RETRY_COUNT", &sqlRetryCount)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_SQL_RETRY_COUNT: %q", parseErr))
+	}
 
 	if len(errList) > 0 {
 		err = fmt.Errorf("Error(s) parsing environment variables: %v", errList)
