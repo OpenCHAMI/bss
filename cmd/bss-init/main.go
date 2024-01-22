@@ -303,7 +303,7 @@ func main() {
 	if err != nil {
 		lg.Fatalf("ERROR: Failed to create migration: %v", err)
 	} else if m == nil {
-		lg.Fatalf("ERROR: Failed to create migration: nil pointer", err)
+		lg.Fatalf("ERROR: Failed to create migration: nil pointer")
 	}
 	defer m.Close()
 	lg.Printf("Successfully created migration instance")
@@ -370,9 +370,9 @@ func main() {
 		// Current version does not match user-specified version.
 		// Migrate up or down from current version to target version.
 		if version < migrateStep {
-			lg.Printf("Migration: DB at version %d, target version %d; upgrading")
+			lg.Printf("Migration: DB at version %d, target version %d; upgrading", version, migrateStep)
 		} else {
-			lg.Printf("Migration: DB at version %d, target version %d; downgrading")
+			lg.Printf("Migration: DB at version %d, target version %d; downgrading", version, migrateStep)
 		}
 		err = m.Migrate(migrateStep)
 		if err == migrate.ErrNoChange {
