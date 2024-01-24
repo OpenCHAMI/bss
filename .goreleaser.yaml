@@ -47,6 +47,7 @@ dockers:
       - CHANGELOG.md
       - README.md
       - .version
+      - migrations/
 
 archives:
   - format: tar.gz
