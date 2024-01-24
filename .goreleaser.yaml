@@ -18,6 +18,16 @@ builds:
     no_unique_dist_dir: true
     tags:
       - dynamic
+  - id: bss-init
+    main: ./cmd/bss-init
+    binary: bss-init
+    goos:
+      - linux
+    goarch:
+      - amd64
+    no_unique_dist_dir: true
+    tags:
+      - dynamic
 
 dockers:
   - 

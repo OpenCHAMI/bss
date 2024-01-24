@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0] - 2024-01-24
+
+- Added bss-init and postgres migrations
+- Moved postgres init code from boot-script-service to bss-init
+- Updated docker-compose postgres and bss-debugger files to use one postgres container
+- Updated go.mod:
+  * Fixed grpc version at v1.29.1 to fix dependency conflict
+  * Added github.com/golang-migrate/migrate v4.16.2
+
 ## [1.27.2] - 2024-01-19
 
 - Added postgres backend
