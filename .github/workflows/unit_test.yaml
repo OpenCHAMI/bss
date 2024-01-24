@@ -5,7 +5,7 @@
       build:
         defaults:
           run:
-            working-directory: ./cmd/boot-script-service
+            working-directory: ./cmd
         runs-on: ubuntu-latest
     
         steps:
@@ -15,7 +15,6 @@
             with:
               go-version: '1.21.x'
           - name: Install dependencies
-            run: go get .
+            run: go get ./boot-script-service ./bss-init
           - name: Test with the Go CLI
-            run: go test
-    
+            run: go test ./boot-script-service ./bss-init

@@ -52,8 +52,10 @@ RUN set -ex \
     && apk -U upgrade \
     && apk add --no-cache curl
 
-# Get the boot-script-service from the builder stage.
+# Get the boot-script-service and bss-init from the builder stage.
 COPY boot-script-service /usr/local/bin/
+COPY bss-init /usr/local/bin/
+COPY migrations/* /migrations/
 COPY .version /
 
 # nobody 65534:65534
