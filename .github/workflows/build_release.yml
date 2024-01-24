@@ -52,10 +52,14 @@ jobs:
           echo "fs.writeFileSync('digest.txt', firstNonNullDigest);" >> process.js
           node process.js
           echo "digest=$(cat digest.txt)" >> $GITHUB_OUTPUT
-      - name: Attest Binaries
+      - name: Attest boot-script-service binary
         uses: github-early-access/generate-build-provenance@main
         with:
           subject-path: dist/boot-script-service
+      - name: Attest bss-init binary
+        uses: github-early-access/generate-build-provenance@main
+        with:
+          subject-path: dist/bss-init
       - name: generate build provenance
         uses: github-early-access/generate-build-provenance@main
         with:
