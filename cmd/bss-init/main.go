@@ -57,7 +57,7 @@ var (
 	sqlRetryCount    = uint64(10)
 	sqlMigrationDir  = "/migrations"
 	printVersion     = false
-	migrateStep      uint
+	migrateStep      = uint(SCHEMA_STEPS)
 	forceStep        = -1
 	lg               = log.New(os.Stdout, "", log.Lshortfile|log.LstdFlags|log.Lmicroseconds)
 	bssdb            *sql.DB
