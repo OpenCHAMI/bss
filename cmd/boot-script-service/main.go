@@ -85,7 +85,7 @@ var (
 	// this well known IP.
 	advertiseAddress  = "" // i.e. http://{IP to reach this service}
 	insecure          = false
-	debugFlag         = true
+	debugFlag         = false
 	kvstore           hmetcd.Kvi
 	retryDelay        = uint(30)
 	hsmRetrievalDelay = uint(10)
@@ -166,33 +166,6 @@ func kvDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
 		if err != nil {
 			log.Println("ERROR enable to parse ETCD_RETRY_WAIT environment variable: ", err)
 			return kvDefaultRetryCount, kvDefaultRetryWait, err
-		}
-	}
-
-	return retryCount, retryWait, nil
-}
-
-// Try to read SQL_RETRY_COUNT and SQL_RETRY_WAIT environment variables.
-// If either variable contains an invalid value, return the default values of both.
-func sqlDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
-	retryCount = sqlDefaultRetryCount
-	retryWait = sqlDefaultRetryWait
-
-	envRetryCount := os.Getenv("SQL_RETRY_COUNT")
-	if envRetryCount != "" {
-		retryCount, err = strconv.ParseUint(envRetryCount, 10, 64)
-		if err != nil {
-			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_COUNT environment variable: %v", err)
-			return kvDefaultRetryCount, kvDefaultRetryWait, err
-		}
-	}
-
-	envRetryWait := os.Getenv("SQL_RETRY_WAIT")
-	if envRetryWait != "" {
-		retryWait, err = strconv.ParseUint(envRetryWait, 10, 64)
-		if err != nil {
-			err = fmt.Errorf("ERROR: unable to parse SQL_RETRY_WAIT environment variable: %v", err)
-			return kvDefaultRetryWait, kvDefaultRetryWait, err
 		}
 	}
 
