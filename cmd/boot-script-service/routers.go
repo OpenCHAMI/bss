@@ -92,16 +92,16 @@ func initHandlers() *chi.Mux {
 				jwtauth.Authenticator(tokenAuth),
 			)
 
-			// register config as protected route
+			// protected routes if using auth
 			r.HandleFunc(baseEndpoint+"/", Index)
 			r.HandleFunc(baseEndpoint+"/bootparameters", bootParameters)
 		})
 	} else {
-		// register config as protected route
+		// public routes without auth
 		router.HandleFunc(baseEndpoint+"/", Index)
 		router.HandleFunc(baseEndpoint+"/bootparameters", bootParameters)
 	}
-	// every thing else if public
+	// every thing else is public
 	// boot
 	router.HandleFunc(baseEndpoint+"/bootscript", bootScript)
 	router.HandleFunc(baseEndpoint+"/hosts", hosts)
