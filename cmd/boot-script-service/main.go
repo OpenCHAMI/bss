@@ -462,12 +462,6 @@ func main() {
 
 	router := initHandlers()
 
-	// print all routes for debug
-	routes := router.Routes()
-	for _, route := range routes {
-		fmt.Printf("route: %s\n", route.Pattern)
-	}
-
 	// try and fetch JWKS from issuer
 	if requireAuth {
 		for i := uint64(0); i <= authRetryCount; i++ {
