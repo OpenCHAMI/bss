@@ -39,8 +39,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	base "github.com/Cray-HPE/hms-base"
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/lestrrat-go/jwx/jwa"
@@ -85,6 +87,12 @@ func loadPublicKeyFromURL(url string) error {
 
 func initHandlers() *chi.Mux {
 	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Logger)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.StripSlashes)
+	router.Use(middleware.Timeout(60 * time.Second))
 	if requireAuth {
 		router.Group(func(r chi.Router) {
 			r.Use(
