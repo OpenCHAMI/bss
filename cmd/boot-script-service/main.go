@@ -464,7 +464,7 @@ func main() {
 
 	// try and fetch JWKS from issuer
 	if requireAuth {
-		for i := 0; i <= int(authRetryCount); i++ {
+		for i := uint64(0); i <= authRetryCount; i++ {
 			err := loadPublicKeyFromURL(jwksURL)
 			if err != nil {
 				log.Printf("failed to initialize auth token: %v", err)
