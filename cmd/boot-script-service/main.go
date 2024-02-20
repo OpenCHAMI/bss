@@ -57,6 +57,7 @@ const kvDefaultRetryCount uint64 = 10
 const kvDefaultRetryWait uint64 = 5
 const sqlDefaultRetryCount uint64 = 10
 const sqlDefaultRetryWait uint64 = 5
+const authDefaultRetryCount uint64 = 10
 
 var (
 	httpListen    = ":27778"
@@ -94,7 +95,7 @@ var (
 	notifier          *ScnNotifier
 	useSQL            = false // Use ETCD by default
 	requireAuth       = false
-	retryAttempts     = 5
+	authRetryCount    = authDefaultRetryCount
 	jwksURL           = ""
 	sqlDbOpts         = ""
 	spireServiceURL   = "https://spire-tokens.spire:54440"
