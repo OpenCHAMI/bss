@@ -26,26 +26,98 @@ STOPSIGNAL SIGTERM
 
 RUN apk add --no-cache tini
 
+# URL of SMD (needed for confirming node existence).
 ENV HSM_URL=http://smd:27779
+# URL of notification daemon.
 ENV NFD_URL=http://cray-hmnfd
 
-# For cloud-init
+# Address of cloud-init server to be added to kernel parameters.
 ENV BSS_ADVERTISE_ADDRESS=localhost
 
+# Use an insecure (no TLS) connection to Etcd or Postgres (whichever is used).
 # WARNING: Our containers currently do not have certificates set up correctly
 #          to allow for https connections to other containers.  Therefore, we
 #          will use an insecure connection.  This needs to be corrected before
-#          release.  Once the certificates are properly set up, the --insecure
-#          option needs to be removed.
+#          release.  Once the certificates are properly set up, this can be
+#          set to false.
 ENV BSS_INSECURE=true
 
+# Seconds to sleep before retrying boot in iPXE boot script if boot fails
+# for some reason.
 ENV BSS_RETRY_DELAY=30
+# Seconds to sleep before retrying iPXE boot in default boot script.
+# This is for when Etcd is being used and we need to wait for node state to
+# be updated before trying to boot.
 ENV BSS_HSM_RETRIEVAL_DELAY=10
 
-# Other potentially useful env variables:
-# BSS_IPXE_SERVER defaults to "api-gw-service-nmn.local"
-# BSS_CHAIN_PROTO defaults to "https"
-# BSS_GW_URI defaults to "/apis/bss"
+# Other potentially useful variables with default values:
+#
+# iPXE server to point nodes to.
+# BSS_IPXE_SERVER=api-gw-service-nmn.local
+#
+# Protocol to use for chains in boot scripts.
+# BSS_CHAIN_PROTO=https
+#
+# The name of BSS.
+# BSS_SERVICE_NAME=boot-script-service
+#
+# Where BSS should listen to requests.
+# BSS_HTTP_LISTEN=:27778
+#
+# URL to listen for notifications on.
+# BSS_ENDPOINT_HOST=""
+#
+# URL of SPIRE token service (not necessary to run BSS).
+# SPIRE_TOKEN_URL=https://spire-tokens.spire:54440
+
+# Etcd variables with default values:
+#
+# Base URL of KV datastore (could alternatively specify by ETCD_HOST and
+# ETCD_PORT below). By default, the in-memory datastore is used (all variables
+# empty).
+# DATASTORE_BASE=""
+# ETCD_HOST=""
+# ETCD_PORT=""
+#
+# Number of times to attempt connection to datastore before giving up.
+# ETCD_RETRY_COUNT=10
+#
+# Seconds between connection attempts.
+# ETCD_RETRY_WAIT=5
+
+# Postgres variables with default values:
+#
+# Configure BSS to use Postgres instead of Etcd.
+# Required to be true for the following variables to be used. Note that Postgres
+# is disabled and Etcd is enabled by default.
+# BSS_USESQL=false
+#
+# Enable BSS debugging messages.
+# BSS_DEBUG=false
+#
+# Location of Postgres server.
+# BSS_DBHOST=localhost
+#
+# Port of Postgres server.
+# BSS_DBPORT=5432
+#
+# Name of BSS database in Postgres to connect to.
+# BSS_DBNAME=bssdb
+#
+# Database options to pass to Postgres.
+# BSS_DBOPTS=""
+#
+# Postgres username.
+# BSS_DBUSER=bssuser
+#
+# Postgres user password.
+# BSS_DBPASS=bssuser
+#
+# How many times to try to connect to Postgres before giving up.
+# BSS_SQL_RETRY_COUNT=10
+#
+# Number of seconds between connection attempts to Postgres.
+# BSS_SQL_RETRY_WAIT=5
 
 # Include curl in the final image.
 RUN set -ex \
