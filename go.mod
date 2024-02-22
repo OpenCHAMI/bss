@@ -18,8 +18,8 @@ require (
 
 require (
 	github.com/OpenCHAMI/smd/v2 v2.12.15
+	github.com/go-chi/chi v1.5.1
 	github.com/go-chi/chi/v5 v5.0.11
-	github.com/go-chi/jwtauth v1.2.0
 	github.com/go-chi/jwtauth/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/lestrrat-go/jwx v1.2.28
