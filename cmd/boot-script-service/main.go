@@ -330,7 +330,7 @@ func parseEnvVars() error {
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_AUTH_RETRY_COUNT: %q", parseErr))
 	}
-	parseErr = parseEnv("BSS_AUTH_REQUIRED", &authRetryCount)
+	parseErr = parseEnv("BSS_AUTH_REQUIRED", &requireAuth)
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_AUTH_REQUIRED: %q", parseErr))
 	}
