@@ -105,6 +105,92 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintln(w, string(out))
 }
 
+func serviceStatusResponse(w http.ResponseWriter, req *http.Request) {
+	var bssStatus serviceStatus
+	var httpStatus = http.StatusOK
+
+	bssStatus.Status = "running"
+
+	w.WriteHeader(httpStatus)
+	out, _ := json.Marshal(bssStatus)
+	fmt.Fprintln(w, string(out))
+}
+
+func serviceVersionResponse(w http.ResponseWriter, req *http.Request) {
+	var bssStatus serviceStatus
+	var httpStatus = http.StatusOK
+
+	dat, err := ioutil.ReadFile(".version")
+	if err != nil {
+		dat, err = ioutil.ReadFile("../../.version")
+		if err != nil {
+			httpStatus = http.StatusInternalServerError
+			dat = []byte("error")
+			log.Printf("Cannot read version file: %s", err)
+		}
+	}
+	bssStatus.Version = strings.TrimSpace(string(dat))
+
+	w.WriteHeader(httpStatus)
+	out, _ := json.Marshal(bssStatus)
+	fmt.Fprintln(w, string(out))
+}
+
+func serviceHSMResponse(w http.ResponseWriter, req *http.Request) {
+	var bssStatus serviceStatus
+	var httpStatus = http.StatusOK
+
+	bssStatus.HSMStatus = "connected"
+	url := smBaseURL + "/service/values/class"
+	rsp, err := smClient.Get(url)
+	if err != nil {
+		httpStatus = http.StatusInternalServerError
+		bssStatus.HSMStatus = "error"
+		log.Printf("Cannot connect to HSM: %s", err)
+	} else {
+		_, err = ioutil.ReadAll(rsp.Body)
+		if err != nil {
+			httpStatus = http.StatusInternalServerError
+			bssStatus.HSMStatus = "error"
+			log.Printf("Cannot read /service/values/class response from HSM: %s", err)
+		}
+		rsp.Body.Close()
+	}
+
+	w.WriteHeader(httpStatus)
+	out, _ := json.Marshal(bssStatus)
+	fmt.Fprintln(w, string(out))
+}
+
+func serviceETCDResponse(w http.ResponseWriter, req *http.Request) {
+	var bssStatus serviceStatus
+	var httpStatus = http.StatusOK
+
+	bssStatus.EctdStatus = "connected"
+	randnum := rand.Intn(255)
+	err := etcdTestStore(randnum)
+	if err != nil {
+		httpStatus = http.StatusInternalServerError
+		bssStatus.EctdStatus = "error"
+		log.Printf("Test store to etcd failed: %s", err)
+	} else {
+		ret, err := etcdTestGet()
+		if err != nil || ret != randnum {
+			httpStatus = http.StatusInternalServerError
+			bssStatus.EctdStatus = "error"
+			if err != nil {
+				log.Printf("Test read from etcd failed: %s", err)
+			} else {
+				log.Printf("Test read from etcd miscompare: Expected %d, Actual %d", randnum, ret)
+			}
+		}
+	}
+
+	w.WriteHeader(httpStatus)
+	out, _ := json.Marshal(bssStatus)
+	fmt.Fprintln(w, string(out))
+}
+
 func etcdTestStore(testId int) error {
 	data, err := json.Marshal(testId)
 	err = kvstore.Store("/bss/etcdTest", string(data))

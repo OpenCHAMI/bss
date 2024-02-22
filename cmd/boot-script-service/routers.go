@@ -36,37 +36,97 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	base "github.com/Cray-HPE/hms-base"
 	"net/http"
+	"time"
+
+	base "github.com/Cray-HPE/hms-base"
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
 )
 
 const (
 	baseEndpoint     = "/boot/v1"
 	notifierEndpoint = baseEndpoint + "/scn"
 	// We don't use the baseEndpoint here because cloud-init doesn't like them
-	metaDataRoute   = "/meta-data"
-	userDataRoute   = "/user-data"
-	phoneHomeRoute  = "/phone-home"
+	metaDataRoute  = "/meta-data"
+	userDataRoute  = "/user-data"
+	phoneHomeRoute = "/phone-home"
 )
 
-func initHandlers() {
-	http.HandleFunc(baseEndpoint+"/", Index)
-	// config
-	http.HandleFunc(baseEndpoint+"/bootparameters", bootParameters)
+var (
+	tokenAuth *jwtauth.JWTAuth
+)
+
+func loadPublicKeyFromURL(url string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	set, err := jwk.Fetch(ctx, url)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+	for it := set.Iterate(context.Background()); it.Next(context.Background()); {
+		pair := it.Pair()
+		key := pair.Value.(jwk.Key)
+
+		var rawkey interface{}
+		if err := key.Raw(&rawkey); err != nil {
+			continue
+		}
+
+		tokenAuth = jwtauth.New(jwa.RS256.String(), nil, rawkey)
+		return nil
+	}
+
+	return fmt.Errorf("failed to load public key: %v", err)
+}
+
+func initHandlers() *chi.Mux {
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Logger)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.StripSlashes)
+	router.Use(middleware.Timeout(60 * time.Second))
+	if requireAuth {
+		router.Group(func(r chi.Router) {
+			r.Use(
+				jwtauth.Verifier(tokenAuth),
+				jwtauth.Authenticator(tokenAuth),
+			)
+
+			// protected routes if using auth
+			r.HandleFunc(baseEndpoint+"/", Index)
+			r.HandleFunc(baseEndpoint+"/bootparameters", bootParameters)
+		})
+	} else {
+		// public routes without auth
+		router.HandleFunc(baseEndpoint+"/", Index)
+		router.HandleFunc(baseEndpoint+"/bootparameters", bootParameters)
+	}
+	// every thing else is public
 	// boot
-	http.HandleFunc(baseEndpoint+"/bootscript", bootScript)
-	http.HandleFunc(baseEndpoint+"/hosts", hosts)
-	http.HandleFunc(baseEndpoint+"/dumpstate", dumpstate)
-	http.HandleFunc(baseEndpoint+"/service/", service)
+	router.HandleFunc(baseEndpoint+"/bootscript", bootScript)
+	router.HandleFunc(baseEndpoint+"/hosts", hosts)
+	router.HandleFunc(baseEndpoint+"/dumpstate", dumpstate)
+	router.HandleFunc(baseEndpoint+"/service/status", serviceStatusResponse)
+	router.HandleFunc(baseEndpoint+"/service/version", serviceVersionResponse)
+	router.HandleFunc(baseEndpoint+"/service/hsm", serviceHSMResponse)
+	router.HandleFunc(baseEndpoint+"/service/etcd", serviceETCDResponse)
 	// cloud-init
-	http.HandleFunc(metaDataRoute, metaDataGet)
-	http.HandleFunc(userDataRoute, userDataGet)
-	http.HandleFunc(phoneHomeRoute, phoneHomePost)
+	router.HandleFunc(metaDataRoute, metaDataGet)
+	router.HandleFunc(userDataRoute, userDataGet)
+	router.HandleFunc(phoneHomeRoute, phoneHomePost)
 	// notifications
-	http.HandleFunc(notifierEndpoint, scn)
+	router.HandleFunc(notifierEndpoint, scn)
 	// endpoint-access
-	http.HandleFunc(baseEndpoint+"/endpoint-history", endpointHistoryGet)
+	router.HandleFunc(baseEndpoint+"/endpoint-history", endpointHistoryGet)
+	return router
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
