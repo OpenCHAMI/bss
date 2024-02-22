@@ -93,7 +93,7 @@ func initHandlers() *chi.Mux {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)
 	router.Use(middleware.Timeout(60 * time.Second))
-	if requireAuth {
+	if jwksURL != "" {
 		router.Group(func(r chi.Router) {
 			r.Use(
 				jwtauth.Verifier(tokenAuth),
