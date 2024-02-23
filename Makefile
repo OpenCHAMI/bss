@@ -25,17 +25,23 @@ NAME ?= bss
 
 # Version
 BUILD := $(shell git rev-parse --short HEAD)
-VERSION := $(shell git describe --tags --abbrev=0 | tr -d v | tee .version)
+VERSION := $(shell git describe --tags --abbrev=0)
 BINARIES = boot-script-service bss-init
 GOOS := $(if $(GOOS),$(GOOS),linux)
 GOARCH := $(if $(GOARCH),$(GOARCH),amd64)
+
+all: version binaries
 
 .PHONY: binaries
 binaries: $(BINARIES)
 
 .PHONY: docker
 docker: $(BINARIES)
-	docker build --tag openchami/bss:v$(VERSION)-dirty .
+	docker build --tag openchami/bss:$(VERSION)-dirty .
+
+.PHONY: version
+version:
+	@echo '$(VERSION)' | tr -d v | tee .version
 
 %: cmd/%/*.go
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -v -tags musl $(LDFLAGS) -o $@ ./$(dir $<)
