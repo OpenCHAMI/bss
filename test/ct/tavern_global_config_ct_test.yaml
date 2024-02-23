@@ -1,9 +1,0 @@
-# This file contains the base common configurations for running pytest tavern tests. It is statically
-# generated, because we anticipate the same settings for all CT test containers that inherit from it.
-name: tavern_global_configuration
-description: common configuration for all tavern invocations
-variables:
-  verify: false
-  bss_base_url: http://cray-bss:27778
-  hsm_base_url: http://cray-smd:27779
-
