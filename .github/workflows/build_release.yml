@@ -32,6 +32,8 @@ jobs:
         with:
           fetch-tags: 1
           fetch-depth: 1
+      - name: Set version in .version file
+        run: make version
       - name: Unit Tests
         run: go test -v ./...
       - name: Release with goreleaser
