@@ -53,5 +53,8 @@ ct:
 ct_image:
 	docker build --no-cache -f test/ct/Dockerfile test/ct/ --tag hms-bss-hmth-test:${VERSION}
 
+BUILD := `git rev-parse --short HEAD`
+VERSION := `git describe --tags --abbrev=0`
+
 docker: $(BINARIES)
 	docker build --tag openchami/bss:v$(VERSION)-dirty $(DOCKEROPTS) .
