@@ -94,7 +94,6 @@ var (
 	sqlRetryWait      = sqlDefaultRetryWait
 	notifier          *ScnNotifier
 	useSQL            = false // Use ETCD by default
-	requireAuth       = false
 	authRetryCount    = authDefaultRetryCount
 	jwksURL           = ""
 	sqlDbOpts         = ""
@@ -303,10 +302,6 @@ func parseEnvVars() error {
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_AUTH_RETRY_COUNT: %q", parseErr))
 	}
-	parseErr = parseEnv("BSS_AUTH_REQUIRED", &requireAuth)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("BSS_AUTH_REQUIRED: %q", parseErr))
-	}
 	parseErr = parseEnv("BSS_JWKS_URL", &jwksURL)
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_JWKS_URL: %q", parseErr))
@@ -405,11 +400,10 @@ func parseCmdLine() {
 	flag.StringVar(&bssdbName, "postgres-dbname", bssdbName, "(BSS_DBNAME) Postgres database name")
 	flag.StringVar(&sqlUser, "postgres-username", sqlUser, "(BSS_DBUSER) Postgres username")
 	flag.StringVar(&sqlPass, "postgres-password", sqlPass, "(BSS_DBPASS) Postgres password")
-	flag.StringVar(&jwksURL, "jwks-url", jwksURL, "(BSS_JWKS_URL) Set the JWKS URL to fetch the public key for authorization")
+	flag.StringVar(&jwksURL, "jwks-url", jwksURL, "(BSS_JWKS_URL) Set the JWKS URL to fetch the public key for authorization (enables authentication)")
 	flag.BoolVar(&insecure, "insecure", insecure, "(BSS_INSECURE) Don't enforce https certificate security")
 	flag.BoolVar(&debugFlag, "debug", debugFlag, "(BSS_DEBUG) Enable debug output")
 	flag.BoolVar(&useSQL, "postgres", useSQL, "(BSS_USESQL) Use Postgres instead of ETCD")
-	flag.BoolVar(&requireAuth, "require-auth", requireAuth, "(BSS_REQUIRE_AUTH) Require JWTs authorization to allow using API endpoint")
 	flag.UintVar(&retryDelay, "retry-delay", retryDelay, "(BSS_RETRY_DELAY) Retry delay in seconds")
 	flag.UintVar(&hsmRetrievalDelay, "hsm-retrieval-delay", hsmRetrievalDelay, "(BSS_HSM_RETRIEVAL_DELAY) SM Retrieval delay in seconds")
 	flag.UintVar(&sqlPort, "postgres-port", sqlPort, "(BSS_DBPORT) Postgres port")
@@ -436,7 +430,7 @@ func main() {
 	router := initHandlers()
 
 	// try and fetch JWKS from issuer
-	if requireAuth {
+	if jwksURL != "" {
 		for i := uint64(0); i <= authRetryCount; i++ {
 			err := loadPublicKeyFromURL(jwksURL)
 			if err != nil {
