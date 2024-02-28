@@ -1,15 +1,15 @@
+// NOTE: Triad License goes here
 package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 )
-
-// NOTE: Triad License goes here
 
 type OAuthClient struct {
 	http.Client
@@ -26,11 +26,39 @@ func (client *OAuthClient) RegisterOAuthClient(registerUrl string, audience []st
 		"token_endpoint_auth_method": "client_secret_post",
 		"scope":                      "openid email profile",
 		"grant_types":                ["client_credentials", "urn:ietf:params:oauth:grant-type:jwt-bearer"],
-		"response_types":             ["token"],
-		"audience":                   [%s]
-	}`, client.Id, client.Secret, strings.Join(audience, ",")))
+		"response_types":             ["token"]
+	}`, client.Id))
 
 	req, err := http.NewRequest("POST", registerUrl, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to do request: %v", err)
+	}
+	defer res.Body.Close()
+
+	return io.ReadAll(res.Body)
+}
+
+func (client *OAuthClient) AuthorizeClient(authorizeUrl string) ([]byte, error) {
+	// encode ID and secret for authorization header basic authentication
+	basicAuth := base64.StdEncoding.EncodeToString(
+		[]byte(fmt.Sprintf("%s:%s",
+			url.QueryEscape(client.Id),
+			url.QueryEscape(client.Secret),
+		)),
+	)
+	body := []byte("grant_type=client_credentials&scope=read")
+	headers := map[string][]string{
+		"Authorization": {basicAuth},
+		"Content-Type":  {"application/x-www-form-urlencoded"},
+	}
+
+	req, err := http.NewRequest("POST", authorizeUrl, bytes.NewBuffer(body))
+	req.Header = headers
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)
 	}

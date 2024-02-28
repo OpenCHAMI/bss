@@ -451,6 +451,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to register OAuth client: %v", err)
 	}
+	_, err = client.AuthorizeClient("http://127.0.0.1:4444/oauth2/auth")
+	if err != nil {
+		log.Fatalf("failed to authorize OAuth client: %v", err)
+	}
 	res, err := client.FetchTokenFromAuthorizationServer("http://127.0.0.1:4444/oauth2/token", []string{})
 	if err != nil {
 		log.Fatalf("failed to fetch token from authorization server: %v", err)
@@ -460,6 +464,7 @@ func main() {
 	var resJson map[string]any
 	json.Unmarshal(res, &resJson)
 	accessToken = resJson["access_token"].(string)
+	log.Printf("Access Token: %v\n", accessToken)
 
 	var svcOpts string
 	if insecure {
