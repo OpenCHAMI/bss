@@ -39,6 +39,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -96,6 +97,7 @@ var (
 	useSQL            = false // Use ETCD by default
 	authRetryCount    = authDefaultRetryCount
 	jwksURL           = ""
+	accessToken       = ""
 	sqlDbOpts         = ""
 	spireServiceURL   = "https://spire-tokens.spire:54440"
 )
@@ -445,8 +447,19 @@ func main() {
 
 	// register oauth client and receive
 	var client OAuthClient
-	client.RegisterOAuthClient("http://127.0.0.1:4444/oauth2/register", []string{})
-	client.FetchTokenFromAuthorizationServer("http://127.0.0.1:4444/oauth2/token", []string{})
+	_, err = client.RegisterOAuthClient("http://127.0.0.1:4444/oauth2/register", []string{})
+	if err != nil {
+		log.Fatalf("failed to register OAuth client: %v", err)
+	}
+	res, err := client.FetchTokenFromAuthorizationServer("http://127.0.0.1:4444/oauth2/token", []string{})
+	if err != nil {
+		log.Fatalf("failed to fetch token from authorization server: %v", err)
+	}
+
+	// unmarshal the access token
+	var resJson map[string]any
+	json.Unmarshal(res, &resJson)
+	accessToken = resJson["access_token"].(string)
 
 	var svcOpts string
 	if insecure {
