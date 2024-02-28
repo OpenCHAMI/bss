@@ -443,6 +443,11 @@ func main() {
 		}
 	}
 
+	// register oauth client and receive
+	var client OAuthClient
+	client.RegisterOAuthClient("http://127.0.0.1:4444/oauth2/register", []string{})
+	client.FetchTokenFromAuthorizationServer("http://127.0.0.1:4444/oauth2/token", []string{})
+
 	var svcOpts string
 	if insecure {
 		svcOpts = "insecure,"
