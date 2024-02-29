@@ -39,7 +39,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -445,25 +444,20 @@ func main() {
 		}
 	}
 
-	// register oauth client and receive
+	// register oauth client and receive token
 	var client OAuthClient
-	_, err = client.RegisterOAuthClient("http://127.0.0.1:4444/oauth2/register", []string{})
+	_, err = client.CreateOAuthClient("http://hydra:4445/admin/clients")
 	if err != nil {
 		log.Fatalf("failed to register OAuth client: %v", err)
 	}
-	_, err = client.AuthorizeClient("http://127.0.0.1:4444/oauth2/auth")
+	_, err = client.AuthorizeOAuthClient("http://hydra:4445/oauth2/auth")
 	if err != nil {
 		log.Fatalf("failed to authorize OAuth client: %v", err)
 	}
-	res, err := client.FetchTokenFromAuthorizationServer("http://127.0.0.1:4444/oauth2/token", []string{})
+	accessToken, err = client.PerformTokenGrant("http://hydra:4444/oauth2/token")
 	if err != nil {
 		log.Fatalf("failed to fetch token from authorization server: %v", err)
 	}
-
-	// unmarshal the access token
-	var resJson map[string]any
-	json.Unmarshal(res, &resJson)
-	accessToken = resJson["access_token"].(string)
 	log.Printf("Access Token: %v\n", accessToken)
 
 	var svcOpts string
