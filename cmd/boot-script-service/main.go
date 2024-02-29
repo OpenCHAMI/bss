@@ -99,6 +99,7 @@ var (
 	accessToken       = ""
 	sqlDbOpts         = ""
 	spireServiceURL   = "https://spire-tokens.spire:54440"
+	oauth2BaseURL      = "http://127.0.0.1:4444"
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
@@ -307,6 +308,10 @@ func parseEnvVars() error {
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_JWKS_URL: %q", parseErr))
 	}
+	parseErr = parseEnv("BSS_OAUTH2_BASE_URL", &oauth2BaseURL)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_OAUTH2_BASE_URL: %q", parseErr))
+	}
 
 	//
 	// Etcd environment variables
@@ -402,6 +407,7 @@ func parseCmdLine() {
 	flag.StringVar(&sqlUser, "postgres-username", sqlUser, "(BSS_DBUSER) Postgres username")
 	flag.StringVar(&sqlPass, "postgres-password", sqlPass, "(BSS_DBPASS) Postgres password")
 	flag.StringVar(&jwksURL, "jwks-url", jwksURL, "(BSS_JWKS_URL) Set the JWKS URL to fetch the public key for authorization (enables authentication)")
+	flag.StringVar(&oauth2BaseURL, "oauth2-base-url", oauth2BaseURL, "(BSS_OAUTH2_BASE_URL) Base URL of the OAUTH2 server for client authorizations")
 	flag.BoolVar(&insecure, "insecure", insecure, "(BSS_INSECURE) Don't enforce https certificate security")
 	flag.BoolVar(&debugFlag, "debug", debugFlag, "(BSS_DEBUG) Enable debug output")
 	flag.BoolVar(&useSQL, "postgres", useSQL, "(BSS_USESQL) Use Postgres instead of ETCD")
@@ -443,18 +449,17 @@ func main() {
 			break
 		}
 	}
-
-	// register oauth client and receive token
+	// register oauth2 client and receive token
 	var client OAuthClient
-	_, err = client.CreateOAuthClient("http://hydra:4445/admin/clients")
+	_, err = client.CreateOAuthClient(oauth2BaseURL+"/admin/clients")
 	if err != nil {
 		log.Fatalf("failed to register OAuth client: %v", err)
 	}
-	_, err = client.AuthorizeOAuthClient("http://hydra:4445/oauth2/auth")
+	_, err = client.AuthorizeOAuthClient(oauth2BaseURL+"/oauth2/auth")
 	if err != nil {
 		log.Fatalf("failed to authorize OAuth client: %v", err)
 	}
-	accessToken, err = client.PerformTokenGrant("http://hydra:4444/oauth2/token")
+	accessToken, err = client.PerformTokenGrant(oauth2BaseURL+"/oauth2/token")
 	if err != nil {
 		log.Fatalf("failed to fetch token from authorization server: %v", err)
 	}
