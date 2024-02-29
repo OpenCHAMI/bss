@@ -99,7 +99,7 @@ var (
 	accessToken       = ""
 	sqlDbOpts         = ""
 	spireServiceURL   = "https://spire-tokens.spire:54440"
-	oauth2BaseURL      = "http://127.0.0.1:4444"
+	oauth2BaseURL     = "http://127.0.0.1:4444"
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
@@ -251,6 +251,42 @@ func getNotifierURL() string {
 	url := "http://" + notifierURL + notifierEndpoint
 	log.Printf("Notification endpoint: %s", url)
 	return url
+}
+
+// Register OAuth2 client and receive access token
+func requestClientCreds() (client OAuthClient, accessToken string, err error) {
+	var url string = oauth2BaseURL + "/admin/clients"
+	log.Printf("Attempting to register OAuth client")
+	debugf("Sending request to %s", url)
+	_, err = client.CreateOAuthClient(url)
+	if err != nil {
+		err = fmt.Errorf("Failed to register OAuth client: %v", err)
+		return
+	}
+	log.Printf("Successfully registered OAuth client")
+	debugf("Client ID: %s", client.Id)
+
+	url = oauth2BaseURL + "/oauth2/auth"
+	log.Printf("Attempting to authorize OAuth client")
+	debugf("Sending request to %s", url)
+	_, err = client.AuthorizeOAuthClient(url)
+	if err != nil {
+		err = fmt.Errorf("Failed to authorize OAuth client: %v", err)
+		return
+	}
+	log.Printf("Successfully authorized OAuth client")
+
+	url = oauth2BaseURL + "/oauth2/token"
+	log.Printf("Attempting to fetch token from authorization server")
+	debugf("Sending request to %s", url)
+	accessToken, err = client.PerformTokenGrant(url)
+	if err != nil {
+		err = fmt.Errorf("Failed to fetch token from authorization server: %v", err)
+		return
+	}
+	fmt.Printf("Successfully fetched token")
+
+	return
 }
 
 func parseEnvVars() error {
@@ -449,19 +485,10 @@ func main() {
 			break
 		}
 	}
-	// register oauth2 client and receive token
-	var client OAuthClient
-	_, err = client.CreateOAuthClient(oauth2BaseURL+"/admin/clients")
+
+	_, accessToken, err = requestClientCreds()
 	if err != nil {
-		log.Fatalf("failed to register OAuth client: %v", err)
-	}
-	_, err = client.AuthorizeOAuthClient(oauth2BaseURL+"/oauth2/auth")
-	if err != nil {
-		log.Fatalf("failed to authorize OAuth client: %v", err)
-	}
-	accessToken, err = client.PerformTokenGrant(oauth2BaseURL+"/oauth2/token")
-	if err != nil {
-		log.Fatalf("failed to fetch token from authorization server: %v", err)
+		log.Fatalf("OAuth client credentials request failed: %v", err)
 	}
 	log.Printf("Access Token: %v\n", accessToken)
 
