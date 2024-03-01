@@ -256,13 +256,18 @@ func getNotifierURL() string {
 
 // Register OAuth2 client and receive access token
 func requestClientCreds() (client OAuthClient, accessToken string, err error) {
-	var url string
+	var (
+		url  string
+		resp []byte
+	)
+
 	url = oauth2AdminBaseURL + "/admin/clients"
 	log.Printf("Attempting to register OAuth2 client")
 	debugf("Sending request to %s", url)
-	_, err = client.CreateOAuthClient(url)
+	resp, err = client.CreateOAuthClient(url)
 	if err != nil {
 		err = fmt.Errorf("Failed to register OAuth2 client: %v", err)
+		debugf("Response: %v", string(resp))
 		return
 	}
 	log.Printf("Successfully registered OAuth2 client")
@@ -274,6 +279,7 @@ func requestClientCreds() (client OAuthClient, accessToken string, err error) {
 	_, err = client.AuthorizeOAuthClient(url)
 	if err != nil {
 		err = fmt.Errorf("Failed to authorize OAuth2 client: %v", err)
+		debugf("Response: %v", string(resp))
 		return
 	}
 	log.Printf("Successfully authorized OAuth2 client")
