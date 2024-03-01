@@ -84,22 +84,23 @@ var (
 	// TODO: Set the default to a well known link local address when we have it.
 	// This will also mean we change the virtual service into an Ingress with
 	// this well known IP.
-	advertiseAddress  = "" // i.e. http://{IP to reach this service}
-	insecure          = false
-	debugFlag         = false
-	kvstore           hmetcd.Kvi
-	retryDelay        = uint(30)
-	hsmRetrievalDelay = uint(10)
-	sqlRetryCount     = sqlDefaultRetryCount
-	sqlRetryWait      = sqlDefaultRetryWait
-	notifier          *ScnNotifier
-	useSQL            = false // Use ETCD by default
-	authRetryCount    = authDefaultRetryCount
-	jwksURL           = ""
-	accessToken       = ""
-	sqlDbOpts         = ""
-	spireServiceURL   = "https://spire-tokens.spire:54440"
-	oauth2BaseURL     = "http://127.0.0.1:4444"
+	advertiseAddress    = "" // i.e. http://{IP to reach this service}
+	insecure            = false
+	debugFlag           = false
+	kvstore             hmetcd.Kvi
+	retryDelay          = uint(30)
+	hsmRetrievalDelay   = uint(10)
+	sqlRetryCount       = sqlDefaultRetryCount
+	sqlRetryWait        = sqlDefaultRetryWait
+	notifier            *ScnNotifier
+	useSQL              = false // Use ETCD by default
+	authRetryCount      = authDefaultRetryCount
+	jwksURL             = ""
+	accessToken         = ""
+	sqlDbOpts           = ""
+	spireServiceURL     = "https://spire-tokens.spire:54440"
+	oauth2AdminBaseURL  = "http://127.0.0.1:4445"
+	oauth2PublicBaseURL = "http://127.0.0.1:4444"
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
@@ -255,7 +256,8 @@ func getNotifierURL() string {
 
 // Register OAuth2 client and receive access token
 func requestClientCreds() (client OAuthClient, accessToken string, err error) {
-	var url string = oauth2BaseURL + "/admin/clients"
+	var url string
+	url = oauth2AdminBaseURL + "/admin/clients"
 	log.Printf("Attempting to register OAuth2 client")
 	debugf("Sending request to %s", url)
 	_, err = client.CreateOAuthClient(url)
@@ -266,7 +268,7 @@ func requestClientCreds() (client OAuthClient, accessToken string, err error) {
 	log.Printf("Successfully registered OAuth2 client")
 	debugf("Client ID: %s", client.Id)
 
-	url = oauth2BaseURL + "/oauth2/auth"
+	url = oauth2AdminBaseURL + "/oauth2/auth"
 	log.Printf("Attempting to authorize OAuth2 client")
 	debugf("Sending request to %s", url)
 	_, err = client.AuthorizeOAuthClient(url)
@@ -276,7 +278,7 @@ func requestClientCreds() (client OAuthClient, accessToken string, err error) {
 	}
 	log.Printf("Successfully authorized OAuth2 client")
 
-	url = oauth2BaseURL + "/oauth2/token"
+	url = oauth2PublicBaseURL + "/oauth2/token"
 	log.Printf("Attempting to fetch token from authorization server")
 	debugf("Sending request to %s", url)
 	accessToken, err = client.PerformTokenGrant(url)
@@ -344,9 +346,13 @@ func parseEnvVars() error {
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_JWKS_URL: %q", parseErr))
 	}
-	parseErr = parseEnv("BSS_OAUTH2_BASE_URL", &oauth2BaseURL)
+	parseErr = parseEnv("BSS_OAUTH2_ADMIN_BASE_URL", &oauth2AdminBaseURL)
 	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("BSS_OAUTH2_BASE_URL: %q", parseErr))
+		errList = append(errList, fmt.Errorf("BSS_OAUTH2_ADMIN_BASE_URL: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_OAUTH2_PUBLIC_BASE_URL", &oauth2PublicBaseURL)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_OAUTH2_PUBLIC_BASE_URL: %q", parseErr))
 	}
 
 	//
@@ -443,7 +449,8 @@ func parseCmdLine() {
 	flag.StringVar(&sqlUser, "postgres-username", sqlUser, "(BSS_DBUSER) Postgres username")
 	flag.StringVar(&sqlPass, "postgres-password", sqlPass, "(BSS_DBPASS) Postgres password")
 	flag.StringVar(&jwksURL, "jwks-url", jwksURL, "(BSS_JWKS_URL) Set the JWKS URL to fetch the public key for authorization (enables authentication)")
-	flag.StringVar(&oauth2BaseURL, "oauth2-base-url", oauth2BaseURL, "(BSS_OAUTH2_BASE_URL) Base URL of the OAUTH2 server for client authorizations")
+	flag.StringVar(&oauth2AdminBaseURL, "oauth2-admin-base-url", oauth2AdminBaseURL, "(BSS_OAUTH2_ADMIN_BASE_URL) Base URL of the OAUTH2 server admin endpoints for client authorizations")
+	flag.StringVar(&oauth2PublicBaseURL, "oauth2-public-base-url", oauth2PublicBaseURL, "(BSS_OAUTH2_PUBLIC_BASE_URL) Base URL of the OAUTH2 server public endpoints (e.g. for token grants)")
 	flag.BoolVar(&insecure, "insecure", insecure, "(BSS_INSECURE) Don't enforce https certificate security")
 	flag.BoolVar(&debugFlag, "debug", debugFlag, "(BSS_DEBUG) Enable debug output")
 	flag.BoolVar(&useSQL, "postgres", useSQL, "(BSS_USESQL) Use Postgres instead of ETCD")

@@ -75,11 +75,16 @@ ENV BSS_HSM_RETRIEVAL_DELAY=10
 # is disabled.
 # BSS_JWKS_URL=""
 #
-# Base URL of the OAUTH2 server to use for client authorizations when
-# JWT authentication is enabled. This is used to authorize BSS to be
-# able to communicate with protected SMD endpoints when it is queried
-# for a boot script.
-# BSS_OAUTH2_BASE_URL=http://127.0.0.1:4444
+# Base URL of the Oauth2 server admin endpoints to use for client authorizations
+# when JWT authentication is enabled. This is used to authorize BSS via a client
+# credentials grant to be able to communicate with protected SMD endpoints when
+# it is queried for a boot script.
+# BSS_OAUTH2_ADMIN_BASE_URL=http://127.0.0.1:4445
+#
+# Base URL of the OAuth2 server public endpoints to use for non-admin requests
+# like a client (e.g. BSS) requesting an access token after it has been
+# authorized.
+# BSS_OAUTH2_USER_BASE_URL=http://127/0/0/1:4444
 
 # Etcd variables with default values:
 #
