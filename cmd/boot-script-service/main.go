@@ -96,7 +96,6 @@ var (
 	useSQL              = false // Use ETCD by default
 	authRetryCount      = authDefaultRetryCount
 	jwksURL             = ""
-	accessToken         = ""
 	sqlDbOpts           = ""
 	spireServiceURL     = "https://spire-tokens.spire:54440"
 	oauth2AdminBaseURL  = "http://127.0.0.1:4445"
@@ -252,49 +251,6 @@ func getNotifierURL() string {
 	url := "http://" + notifierURL + notifierEndpoint
 	log.Printf("Notification endpoint: %s", url)
 	return url
-}
-
-// Register OAuth2 client and receive access token
-func requestClientCreds() (client OAuthClient, accessToken string, err error) {
-	var (
-		url  string
-		resp []byte
-	)
-
-	url = oauth2AdminBaseURL + "/admin/clients"
-	log.Printf("Attempting to register OAuth2 client")
-	debugf("Sending request to %s", url)
-	resp, err = client.CreateOAuthClient(url)
-	if err != nil {
-		err = fmt.Errorf("Failed to register OAuth2 client: %v", err)
-		debugf("Response: %v", string(resp))
-		return
-	}
-	log.Printf("Successfully registered OAuth2 client")
-	debugf("Client ID: %s", client.Id)
-
-	url = oauth2AdminBaseURL + "/oauth2/auth"
-	log.Printf("Attempting to authorize OAuth2 client")
-	debugf("Sending request to %s", url)
-	_, err = client.AuthorizeOAuthClient(url)
-	if err != nil {
-		err = fmt.Errorf("Failed to authorize OAuth2 client: %v", err)
-		debugf("Response: %v", string(resp))
-		return
-	}
-	log.Printf("Successfully authorized OAuth2 client")
-
-	url = oauth2PublicBaseURL + "/oauth2/token"
-	log.Printf("Attempting to fetch token from authorization server")
-	debugf("Sending request to %s", url)
-	accessToken, err = client.PerformTokenGrant(url)
-	if err != nil {
-		err = fmt.Errorf("Failed to fetch token from authorization server: %v", err)
-		return
-	}
-	fmt.Printf("Successfully fetched token")
-
-	return
 }
 
 func parseEnvVars() error {

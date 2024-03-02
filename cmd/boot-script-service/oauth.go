@@ -22,6 +22,8 @@ import (
 	"net/url"
 )
 
+var accessToken = ""
+
 type OAuthClient struct {
 	http.Client
 	Id                      string
@@ -143,4 +145,55 @@ func QuoteArrayStrings(arr []string) []string {
 		arr[i] = "\"" + v + "\""
 	}
 	return arr
+}
+
+// RequestClientCreds performs the requests to the OAuth2 server to obtain an
+// access token for this client (BSS).
+//
+// 1. Register as OAuth2 client.
+// 2. Authorize OAuth2 client that was created.
+// 3. Obtain access token if OAuth2 client is authorized.
+//
+// Returns the OAuthClient struct containing the client ID, secret, etc. as well
+// as the access token and an error if one occurred.
+func RequestClientCreds() (client OAuthClient, accessToken string, err error) {
+	var (
+		url  string
+		resp []byte
+	)
+
+	url = oauth2AdminBaseURL + "/admin/clients"
+	log.Printf("Attempting to register OAuth2 client")
+	debugf("Sending request to %s", url)
+	resp, err = client.CreateOAuthClient(url)
+	if err != nil {
+		err = fmt.Errorf("Failed to register OAuth2 client: %v", err)
+		debugf("Response: %v", string(resp))
+		return
+	}
+	log.Printf("Successfully registered OAuth2 client")
+	debugf("Client ID: %s", client.Id)
+
+	url = oauth2AdminBaseURL + "/oauth2/auth"
+	log.Printf("Attempting to authorize OAuth2 client")
+	debugf("Sending request to %s", url)
+	_, err = client.AuthorizeOAuthClient(url)
+	if err != nil {
+		err = fmt.Errorf("Failed to authorize OAuth2 client: %v", err)
+		debugf("Response: %v", string(resp))
+		return
+	}
+	log.Printf("Successfully authorized OAuth2 client")
+
+	url = oauth2PublicBaseURL + "/oauth2/token"
+	log.Printf("Attempting to fetch token from authorization server")
+	debugf("Sending request to %s", url)
+	accessToken, err = client.PerformTokenGrant(url)
+	if err != nil {
+		err = fmt.Errorf("Failed to fetch token from authorization server: %v", err)
+		return
+	}
+	fmt.Printf("Successfully fetched token")
+
+	return
 }
