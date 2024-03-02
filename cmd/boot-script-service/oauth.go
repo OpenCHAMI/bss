@@ -242,6 +242,40 @@ func PollClientCreds(retryCount, retryInterval uint64) error {
 	return fmt.Errorf("Exhausted %d attempts at obtaining client credentials and token")
 }
 
+// JWTTestAndRefresh tests the current JWT. If either a parsing error occurs
+// with it or the JWT is invalid, it attempts to fetch a new one. If all of this
+// succeeds, nil is returned. Otherwise, an error is returned.
+func JWTTestAndRefresh() (err error) {
+	var (
+		jwtIsValid bool
+		reason     error
+	)
+
+	log.Printf("Validating JWT")
+	if accessToken != "" {
+		jwtIsValid, reason, err = JWTIsValid(accessToken)
+		if err != nil {
+			log.Printf("Unable to parse JWT, attempting to fetch a new one")
+		} else if !jwtIsValid {
+			log.Printf("JWT invalid, reason: %v", reason)
+			log.Printf("Attempting to fetch a new one")
+		} else {
+			log.Printf("JWT is valid")
+			return nil
+		}
+	} else {
+		log.Printf("No JWT detected, fetching a new one")
+	}
+
+	err = PollClientCreds(authRetryCount, 5)
+	if err != nil {
+		log.Printf("Polling for OAuth2 client credentials failed")
+		return fmt.Errorf("Failed to get access token: %v", err)
+	}
+	log.Printf("Successfully fetched new JWT")
+	return nil
+}
+
 // JWTIsValid takes a string representing a JWT and validates that it is not
 // expired. If the JWT is invalid (timestamp(s) is/are out of range), jwtValid
 // is set to false, reason is set to the reason why the JWT is not valid, and
