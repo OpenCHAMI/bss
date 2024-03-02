@@ -205,31 +205,9 @@ func SmOpen(base, options string) error {
 	}
 	if smAuthEnabled {
 		log.Printf("HSM authenticated endpoints enabled, checking token")
-		if accessToken == "" {
-			log.Printf("No access token, requesting one from OAuth2 server")
-			err = PollClientCreds(authRetryCount, 5)
-			if err != nil {
-				log.Printf("Polling for OAuth2 client credentials failed")
-				return fmt.Errorf("Failed to get access token for HSM: %v", err)
-			}
-		}
-		log.Printf("Checking JWT validity")
-		var jwtValid bool
-		var reason error
-		jwtValid, reason, err = JWTIsValid(accessToken)
+		err = JWTTestAndRefresh()
 		if err != nil {
-			return fmt.Errorf("Error checking JWT validity: %v", err)
-		} else if !jwtValid {
-			log.Printf("JWT is not valid, reason: %v", reason)
-			log.Printf("Attempting to obtain new JWT")
-			err = PollClientCreds(authRetryCount, 5)
-			if err != nil {
-				log.Printf("Polling for OAuth2 client credentials failed")
-				return fmt.Errorf("Failed to get access token for HSM: %v", err)
-			}
-			log.Printf("Successfully obtained new JWT")
-		} else {
-			log.Printf("JWT is valid")
+			return fmt.Errorf("Failed refreshing JWT: %v", err)
 		}
 	}
 	return nil
