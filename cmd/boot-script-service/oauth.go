@@ -18,8 +18,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"time"
+
+	"github.com/lestrrat-go/jwx/jwt"
 )
 
 var accessToken = ""
@@ -30,6 +34,21 @@ type OAuthClient struct {
 	Secret                  string
 	RegistrationAccessToken string
 	RedirectUris            []string
+}
+
+// This is to implement jwt.Clock and provide the Now() function. An empty
+// instance of this struct will be passed to the jwt.WithClock() function so it
+// knows how to verify the timestamps.
+type nowClock struct {
+	jwt.Clock
+}
+
+// This function returns whatever "now" is for jwt.Clock. We simply return
+// time.Now(). It would be nice if we could just pass time.Now() to the
+// jwt.WithClock function, but it forces us to have something that implements
+// the jwt.Clock interface to do it.
+func (nc nowClock) Now() time.Time {
+	return time.Now()
 }
 
 func (client *OAuthClient) CreateOAuthClient(registerUrl string) ([]byte, error) {
@@ -194,6 +213,57 @@ func RequestClientCreds() (client OAuthClient, accessToken string, err error) {
 		return
 	}
 	fmt.Printf("Successfully fetched token")
+
+	return
+}
+
+// PollClientCreds tries retryCount times every retryInterval seconds to request
+// client credentials and an access token (JWT) from the OAuth2 server. If
+// attempts are exhausted or an invalid retryInterval is passed, an error is
+// returned. If a JWT was successfully obtained, nil is returned.
+func PollClientCreds(retryCount, retryInterval uint64) error {
+	retryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", retryInterval))
+	if err != nil {
+		return fmt.Errorf("Invalid retry interval: %v", err)
+	}
+	for i := uint64(0); i < retryCount; i++ {
+		log.Printf("Attempting to obtain access token (attempt %d/%d)", i+1, retryCount)
+		_, token, err := RequestClientCreds()
+		if err != nil {
+			log.Printf("Failed to obtain client credentials and token: %v", err)
+			time.Sleep(retryDuration)
+			continue
+		}
+		log.Printf("Successfully obtained client credentials and token with %d attempts", i+1)
+		accessToken = token
+		return nil
+	}
+	log.Printf("Exhausted attempts to obtain client credentials and token")
+	return fmt.Errorf("Exhausted %d attempts at obtaining client credentials and token")
+}
+
+// JWTIsValid takes a string representing a JWT and validates that it is not
+// expired. If the JWT is invalid (timestamp(s) is/are out of range), jwtValid
+// is set to false, reason is set to the reason why the JWT is not valid, and
+// err is nil.  If the JWT is valid (timestamps are all in range), jwtValid is
+// set to true, reason is nil, and err is nil.
+func JWTIsValid(jwtStr string) (jwtValid bool, reason, err error) {
+	var token jwt.Token
+	token, err = jwt.Parse([]byte(jwtStr))
+	if err != nil {
+		err = fmt.Errorf("failed to parse JWT string: %v", err)
+		return
+	}
+
+	// Right now, we only validate the issued at, expiry, and not before
+	// fields.
+	// TODO: Add full validation.
+	reason = jwt.Validate(token, jwt.WithClock(nowClock{}))
+	if reason == nil {
+		jwtValid = true
+	} else {
+		jwtValid = false
+	}
 
 	return
 }
