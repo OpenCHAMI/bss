@@ -455,12 +455,6 @@ func main() {
 		}
 	}
 
-	_, accessToken, err = requestClientCreds()
-	if err != nil {
-		log.Fatalf("OAuth2 client credentials request failed: %v", err)
-	}
-	log.Printf("Access Token: %v\n", accessToken)
-
 	var svcOpts string
 	if insecure {
 		svcOpts = "insecure,"
@@ -477,6 +471,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Access to SM service %s failed: %v\n", hsmBase, err)
 	}
+	log.Printf("Access Token: %v\n", accessToken)
 
 	notifier = newNotifier(serviceName, nfdBase+"/hmi/v1/subscribe", getNotifierURL(), svcOpts)
 

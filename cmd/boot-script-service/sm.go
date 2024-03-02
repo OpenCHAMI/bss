@@ -49,8 +49,11 @@ import (
 	"github.com/OpenCHAMI/smd/v2/pkg/sm"
 )
 
-const badMAC = "not available"
-const undefinedMAC = "ff:ff:ff:ff:ff:ff"
+const (
+	badMAC       = "not available"
+	undefinedMAC = "ff:ff:ff:ff:ff:ff"
+	hsmTestEP    = "/Inventory/RedfishEndpoints"
+)
 
 type SMComponent struct {
 	base.Component
@@ -80,6 +83,64 @@ func makeSmMap(state *SMData) map[string]SMComponent {
 		m[v.ID] = v
 	}
 	return m
+}
+
+func TestSMAuthEnabled() (authEnabled bool, err error) {
+	var (
+		testURL string
+		resp    *http.Response
+	)
+
+	// If this endpoint is protected (querying it returns a 401),
+	// auth is enabled.
+	testURL, err = url.JoinPath(smBaseURL, hsmTestEP)
+	if err != nil {
+		err = fmt.Errorf("Could not join URL paths %q and %q: %v", smBaseURL, hsmTestEP, err)
+		return
+	}
+
+	resp, err = http.Get(testURL)
+	if err != nil {
+		err = fmt.Errorf("Could not GET %q: %v", testURL, err)
+		return
+	}
+	if resp.StatusCode == 401 {
+		authEnabled = true
+	} else {
+		authEnabled = false
+	}
+
+	return
+}
+
+func TestSMProtectedAccess() error {
+	var (
+		req *http.Request
+		res *http.Response
+	)
+
+	if accessToken == "" {
+		return fmt.Errorf("Access token is empty")
+	}
+
+	testURL, err := url.JoinPath(smBaseURL, hsmTestEP)
+	if err != nil {
+		err = fmt.Errorf("Could not join URL paths %q and %q: %v", smBaseURL, hsmTestEP, err)
+		return err
+	}
+
+	req, err = http.NewRequest("GET", testURL, nil)
+	headers := map[string][]string{
+		"Authorization": {"Bearer " + accessToken},
+	}
+	req.Header = headers
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("Could not execute request: %v")
+	}
+	defer res.Body.Close()
+
+	return nil
 }
 
 func SmOpen(base, options string) error {
@@ -136,6 +197,41 @@ func SmOpen(base, options string) error {
 	}
 	smBaseURL = base + "/hsm/v2"
 	log.Printf("Accessing state manager via %s\n", smBaseURL)
+
+	var smAuthEnabled bool
+	smAuthEnabled, err = TestSMAuthEnabled()
+	if err != nil {
+		return fmt.Errorf("Failed testing if HSM auth is enabled: %v", err)
+	}
+	if smAuthEnabled {
+		log.Printf("HSM authenticated endpoints enabled, checking token")
+		if accessToken == "" {
+			log.Printf("No access token, requesting one from OAuth2 server")
+			err = PollClientCreds(authRetryCount, 5)
+			if err != nil {
+				log.Printf("Polling for OAuth2 client credentials failed")
+				return fmt.Errorf("Failed to get access token for HSM: %v", err)
+			}
+		}
+		log.Printf("Checking JWT validity")
+		var jwtValid bool
+		var reason error
+		jwtValid, reason, err = JWTIsValid(accessToken)
+		if err != nil {
+			return fmt.Errorf("Error checking JWT validity: %v", err)
+		} else if !jwtValid {
+			log.Printf("JWT is not valid, reason: %v", reason)
+			log.Printf("Attempting to obtain new JWT")
+			err = PollClientCreds(authRetryCount, 5)
+			if err != nil {
+				log.Printf("Polling for OAuth2 client credentials failed")
+				return fmt.Errorf("Failed to get access token for HSM: %v", err)
+			}
+			log.Printf("Successfully obtained new JWT")
+		} else {
+			log.Printf("JWT is valid")
+		}
+	}
 	return nil
 }
 
