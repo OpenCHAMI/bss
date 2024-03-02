@@ -257,6 +257,22 @@ func ensureLegalMAC(mac string) string {
 
 func getStateFromHSM() *SMData {
 	if smClient != nil {
+		var headers map[string][]string
+		authEnabled, err := TestSMAuthEnabled()
+		if err != nil {
+			log.Printf("Failed to test if SM auth is enabled: %v")
+			return nil
+		}
+		if authEnabled {
+			err = JWTTestAndRefresh()
+			if err != nil {
+				log.Printf("Failed to refresh JWT: %v", err)
+				return nil
+			}
+			headers = map[string][]string{
+				"Authorization": {"Bearer " + accessToken},
+			}
+		}
 		log.Printf("Retrieving state info from %s", smBaseURL)
 		url := smBaseURL + "/State/Components?type=Node"
 		debugf("url: %s, smClient: %v\n", url, smClient)
@@ -264,6 +280,9 @@ func getStateFromHSM() *SMData {
 		if rerr != nil {
 			log.Printf("Failed to create HTTP request for '%s': %v", url, rerr)
 			return nil
+		}
+		if authEnabled {
+			req.Header = headers
 		}
 		req.Close = true
 		base.SetHTTPUserAgent(req, serviceName)
@@ -287,6 +306,9 @@ func getStateFromHSM() *SMData {
 		if err != nil {
 			log.Printf("Failed to create HTTP request for '%s': %v", url, rerr)
 			return nil
+		}
+		if authEnabled {
+			req.Header = headers
 		}
 		req.Close = true
 		base.SetHTTPUserAgent(req, serviceName)
@@ -354,6 +376,9 @@ func getStateFromHSM() *SMData {
 		if err != nil {
 			log.Printf("Failed to create HTTP request for '%s': %v", url, rerr)
 			return nil
+		}
+		if authEnabled {
+			req.Header = headers
 		}
 		req.Close = true
 		base.SetHTTPUserAgent(req, serviceName)
