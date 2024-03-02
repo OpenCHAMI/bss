@@ -129,7 +129,7 @@ func TestSMProtectedAccess() error {
 		return err
 	}
 
-	req, err = http.NewRequest("GET", testURL, nil)
+	req, err = http.NewRequest(http.MethodGet, testURL, nil)
 	headers := map[string][]string{
 		"Authorization": {"Bearer " + accessToken},
 	}

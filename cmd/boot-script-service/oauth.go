@@ -63,7 +63,7 @@ func (client *OAuthClient) CreateOAuthClient(registerUrl string) ([]byte, error)
 		"state":                      "12345678910"
 	}`)
 
-	req, err := http.NewRequest("POST", registerUrl, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPost, registerUrl, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)
 	}
@@ -110,7 +110,7 @@ func (client *OAuthClient) AuthorizeOAuthClient(authorizeUrl string) ([]byte, er
 		"Content-Type":  {"application/x-www-form-urlencoded"},
 	}
 
-	req, err := http.NewRequest("POST", authorizeUrl, bytes.NewBuffer(body))
+	req, err := http.NewRequest(http.MethodPost, authorizeUrl, bytes.NewBuffer(body))
 	req.Header = headers
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)
@@ -134,7 +134,7 @@ func (client *OAuthClient) PerformTokenGrant(remoteUrl string) (string, error) {
 		"Content-Type":  {"application/x-www-form-urlencoded"},
 		"Authorization": {"Bearer " + client.RegistrationAccessToken},
 	}
-	req, err := http.NewRequest("POST", remoteUrl, bytes.NewBuffer([]byte(body)))
+	req, err := http.NewRequest(http.MethodPost, remoteUrl, bytes.NewBuffer([]byte(body)))
 	req.Header = headers
 	if err != nil {
 		return "", fmt.Errorf("failed to make request: %s", err)
