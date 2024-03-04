@@ -212,7 +212,7 @@ func RequestClientCreds() (client OAuthClient, accessToken string, err error) {
 		err = fmt.Errorf("Failed to fetch token from authorization server: %v", err)
 		return
 	}
-	fmt.Printf("Successfully fetched token")
+	log.Printf("Successfully fetched token")
 
 	return
 }
