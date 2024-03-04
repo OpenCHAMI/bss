@@ -70,7 +70,7 @@ type SMData struct {
 var (
 	smMutex     sync.Mutex
 	smData      *SMData
-	smClient    *http.Client
+	smClient    *OAuthClient
 	smDataMap   map[string]SMComponent
 	smBaseURL   string
 	smJSONFile  string
@@ -198,7 +198,7 @@ func SmOpen(base, options string) error {
 		}
 	}
 	// Using the Datastore service
-	smClient = new(http.Client)
+	smClient = new(OAuthClient)
 	if https && insecure {
 		tcfg := new(tls.Config)
 		tcfg.InsecureSkipVerify = true
