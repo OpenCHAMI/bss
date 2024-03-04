@@ -106,7 +106,7 @@ func TestSMAuthEnabled(retryCount, retryInterval uint64) (authEnabled bool, err 
 	}
 	for retry := uint64(0); retry < retryCount; retry++ {
 		log.Printf("Attempting connection to %s (attempt %d/%d)", testURL, retry+1, retryCount)
-		resp, err = http.Get(testURL)
+		resp, err = smClient.Get(testURL)
 		if err != nil {
 			err = fmt.Errorf("Could not GET %q: %v", testURL, err)
 			time.Sleep(retryDuration)
@@ -147,7 +147,7 @@ func TestSMProtectedAccess() error {
 		"Authorization": {"Bearer " + accessToken},
 	}
 	req.Header = headers
-	res, err = http.DefaultClient.Do(req)
+	res, err = smClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("Could not execute request: %v")
 	}
@@ -218,7 +218,7 @@ func SmOpen(base, options string) error {
 	}
 	if smAuthEnabled {
 		log.Printf("HSM authenticated endpoints enabled, checking token")
-		err = JWTTestAndRefresh()
+		err = smClient.JWTTestAndRefresh()
 		if err != nil {
 			return fmt.Errorf("Failed refreshing JWT: %v", err)
 		}
@@ -277,7 +277,7 @@ func getStateFromHSM() *SMData {
 			return nil
 		}
 		if authEnabled {
-			err = JWTTestAndRefresh()
+			err = smClient.JWTTestAndRefresh()
 			if err != nil {
 				log.Printf("Failed to refresh JWT: %v", err)
 				return nil

@@ -175,7 +175,7 @@ func QuoteArrayStrings(arr []string) []string {
 //
 // Returns the OAuthClient struct containing the client ID, secret, etc. as well
 // as the access token and an error if one occurred.
-func RequestClientCreds() (client OAuthClient, accessToken string, err error) {
+func (client *OAuthClient) RequestClientCreds() (accessToken string, err error) {
 	var (
 		url  string
 		resp []byte
@@ -221,14 +221,14 @@ func RequestClientCreds() (client OAuthClient, accessToken string, err error) {
 // client credentials and an access token (JWT) from the OAuth2 server. If
 // attempts are exhausted or an invalid retryInterval is passed, an error is
 // returned. If a JWT was successfully obtained, nil is returned.
-func PollClientCreds(retryCount, retryInterval uint64) error {
+func (client *OAuthClient) PollClientCreds(retryCount, retryInterval uint64) error {
 	retryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", retryInterval))
 	if err != nil {
 		return fmt.Errorf("Invalid retry interval: %v", err)
 	}
 	for i := uint64(0); i < retryCount; i++ {
 		log.Printf("Attempting to obtain access token (attempt %d/%d)", i+1, retryCount)
-		_, token, err := RequestClientCreds()
+		token, err := client.RequestClientCreds()
 		if err != nil {
 			log.Printf("Failed to obtain client credentials and token: %v", err)
 			time.Sleep(retryDuration)
@@ -245,7 +245,7 @@ func PollClientCreds(retryCount, retryInterval uint64) error {
 // JWTTestAndRefresh tests the current JWT. If either a parsing error occurs
 // with it or the JWT is invalid, it attempts to fetch a new one. If all of this
 // succeeds, nil is returned. Otherwise, an error is returned.
-func JWTTestAndRefresh() (err error) {
+func (client *OAuthClient) JWTTestAndRefresh() (err error) {
 	var (
 		jwtIsValid bool
 		reason     error
@@ -267,7 +267,7 @@ func JWTTestAndRefresh() (err error) {
 		log.Printf("No JWT detected, fetching a new one")
 	}
 
-	err = PollClientCreds(authRetryCount, authRetryWait)
+	err = client.PollClientCreds(authRetryCount, authRetryWait)
 	if err != nil {
 		log.Printf("Polling for OAuth2 client credentials failed")
 		return fmt.Errorf("Failed to get access token: %v", err)
