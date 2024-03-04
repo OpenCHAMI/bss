@@ -324,7 +324,7 @@ func getStateFromHSM() *SMData {
 
 		url = smBaseURL + "/Inventory/ComponentEndpoints?type=Node"
 		req, rerr = http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
+		if rerr != nil {
 			log.Printf("Failed to create HTTP request for '%s': %v", url, rerr)
 			return nil
 		}
@@ -394,7 +394,7 @@ func getStateFromHSM() *SMData {
 		//ip address
 		url = smBaseURL + "/Inventory/EthernetInterfaces?type=Node"
 		req, rerr = http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
+		if rerr != nil {
 			log.Printf("Failed to create HTTP request for '%s': %v", url, rerr)
 			return nil
 		}
