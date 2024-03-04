@@ -53,11 +53,14 @@ import (
 	"github.com/OpenCHAMI/bss/internal/postgres"
 )
 
-const kvDefaultRetryCount uint64 = 10
-const kvDefaultRetryWait uint64 = 5
-const sqlDefaultRetryCount uint64 = 10
-const sqlDefaultRetryWait uint64 = 5
-const authDefaultRetryCount uint64 = 10
+const (
+	kvDefaultRetryCount   uint64 = 10
+	kvDefaultRetryWait    uint64 = 5
+	sqlDefaultRetryCount  uint64 = 10
+	sqlDefaultRetryWait   uint64 = 5
+	authDefaultRetryCount uint64 = 10
+	authDefaultRetryWait  uint64 = 5
+)
 
 var (
 	httpListen    = ":27778"
@@ -95,6 +98,7 @@ var (
 	notifier            *ScnNotifier
 	useSQL              = false // Use ETCD by default
 	authRetryCount      = authDefaultRetryCount
+	authRetryWait       = authDefaultRetryWait
 	jwksURL             = ""
 	sqlDbOpts           = ""
 	spireServiceURL     = "https://spire-tokens.spire:54440"
@@ -304,6 +308,10 @@ func parseEnvVars() error {
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_AUTH_RETRY_COUNT: %q", parseErr))
 	}
+	parseErr = parseEnv("BSS_AUTH_RETRY_WAIT", &authRetryWait)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_AUTH_RETRY_WAIT: %q", parseErr))
+	}
 	parseErr = parseEnv("BSS_JWKS_URL", &jwksURL)
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_JWKS_URL: %q", parseErr))
@@ -420,6 +428,7 @@ func parseCmdLine() {
 	flag.UintVar(&hsmRetrievalDelay, "hsm-retrieval-delay", hsmRetrievalDelay, "(BSS_HSM_RETRIEVAL_DELAY) SM Retrieval delay in seconds")
 	flag.UintVar(&sqlPort, "postgres-port", sqlPort, "(BSS_DBPORT) Postgres port")
 	flag.Uint64Var(&authRetryCount, "auth-retry-count", authRetryCount, "(BSS_AUTH_RETRY_COUNT) Retry fetching JWKS public key set")
+	flag.Uint64Var(&authRetryWait, "auth-retry-wait", authRetryWait, "(BSS_AUTH_RETRY_WAIT) Interval in seconds between authentication request attempts")
 	flag.Uint64Var(&sqlRetryCount, "postgres-retry-count", sqlRetryCount, "(BSS_SQL_RETRY_COUNT) Amount of times to retry connecting to Postgres")
 	flag.Uint64Var(&sqlRetryWait, "postgres-retry-wait", sqlRetryCount, "(BSS_SQL_RETRY_WAIT) Interval in seconds between connection attempts to Postgres")
 	flag.Parse()

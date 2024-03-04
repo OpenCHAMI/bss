@@ -267,7 +267,7 @@ func JWTTestAndRefresh() (err error) {
 		log.Printf("No JWT detected, fetching a new one")
 	}
 
-	err = PollClientCreds(authRetryCount, 5)
+	err = PollClientCreds(authRetryCount, authRetryWait)
 	if err != nil {
 		log.Printf("Polling for OAuth2 client credentials failed")
 		return fmt.Errorf("Failed to get access token: %v", err)

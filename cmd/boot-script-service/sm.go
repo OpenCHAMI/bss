@@ -85,7 +85,7 @@ func makeSmMap(state *SMData) map[string]SMComponent {
 	return m
 }
 
-func TestSMAuthEnabled() (authEnabled bool, err error) {
+func TestSMAuthEnabled(retryCount, retryInterval uint64) (authEnabled bool, err error) {
 	var (
 		testURL string
 		resp    *http.Response
@@ -99,17 +99,29 @@ func TestSMAuthEnabled() (authEnabled bool, err error) {
 		return
 	}
 
-	resp, err = http.Get(testURL)
+	retryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", retryInterval))
 	if err != nil {
-		err = fmt.Errorf("Could not GET %q: %v", testURL, err)
+		err = fmt.Errorf("Invalid retry interval: %v", err)
 		return
 	}
-	if resp.StatusCode == 401 {
-		authEnabled = true
-	} else {
-		authEnabled = false
+	for retry := uint64(0); retry < retryCount; retry++ {
+		log.Printf("Attempting connection to %s (attempt %d/%d)", testURL, retry+1, retryCount)
+		resp, err = http.Get(testURL)
+		if err != nil {
+			err = fmt.Errorf("Could not GET %q: %v", testURL, err)
+			time.Sleep(retryDuration)
+			continue
+		}
+		if resp.StatusCode == 401 {
+			authEnabled = true
+		} else {
+			authEnabled = false
+		}
+
+		return
 	}
 
+	err = fmt.Errorf("Number of retries (%d) exhausted when testing if SMD auth is enabled", retryCount)
 	return
 }
 
@@ -199,7 +211,7 @@ func SmOpen(base, options string) error {
 	log.Printf("Accessing state manager via %s\n", smBaseURL)
 
 	var smAuthEnabled bool
-	smAuthEnabled, err = TestSMAuthEnabled()
+	smAuthEnabled, err = TestSMAuthEnabled(authRetryCount, authRetryWait)
 	if err != nil {
 		return fmt.Errorf("Failed testing if HSM auth is enabled: %v", err)
 	}
@@ -258,7 +270,7 @@ func ensureLegalMAC(mac string) string {
 func getStateFromHSM() *SMData {
 	if smClient != nil {
 		var headers map[string][]string
-		authEnabled, err := TestSMAuthEnabled()
+		authEnabled, err := TestSMAuthEnabled(authRetryCount, authRetryWait)
 		if err != nil {
 			log.Printf("Failed to test if SM auth is enabled: %v")
 			return nil
