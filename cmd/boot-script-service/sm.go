@@ -279,6 +279,7 @@ func ensureLegalMAC(mac string) string {
 func getStateFromHSM() *SMData {
 	if smClient != nil {
 		var headers map[string][]string
+		var body []byte
 		authEnabled, err := TestSMAuthEnabled(authRetryCount, authRetryWait)
 		if err != nil {
 			log.Printf("Failed to test if SM auth is enabled: %v")
@@ -308,13 +309,23 @@ func getStateFromHSM() *SMData {
 		req.Close = true
 		base.SetHTTPUserAgent(req, serviceName)
 		r, err := smClient.Do(req)
+		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
 		if err != nil {
 			log.Printf("Sm State request %s failed: %v", url, err)
 			return nil
 		}
-		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
 		var comps SMData
-		err = json.NewDecoder(r.Body).Decode(&comps)
+		body, err = ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Failed to read response body: %v", err)
+			return nil
+		}
+		debugf("Response: %v", string(body))
+		err = json.Unmarshal(body, &comps)
+		if err != nil {
+			log.Printf("Failed to unmarshal response body: %v", err)
+			return nil
+		}
 		r.Body.Close()
 		// Set up an indexing map to speed up lookup of components in the list
 		compsIndex := make(map[string]int, len(comps.Components))
@@ -334,15 +345,25 @@ func getStateFromHSM() *SMData {
 		req.Close = true
 		base.SetHTTPUserAgent(req, serviceName)
 		r, err = smClient.Do(req)
+		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
 		if err != nil {
 			log.Printf("Sm Inventory request %s failed: %v", url, err)
 			return nil
 		}
 		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
 		var ep sm.ComponentEndpointArray
-		ce, err := ioutil.ReadAll(r.Body)
+		var ce []byte
+		ce, err = ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Failed to read response body: %v", err)
+			return nil
+		}
+		debugf("Response: %v", string(ce))
 		err = json.Unmarshal(ce, &ep)
-		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
+		if err != nil {
+			log.Printf("Failed to unmarshal response body: %v", err)
+			return nil
+		}
 		r.Body.Close()
 
 		type myCompEndpt struct {
@@ -408,12 +429,19 @@ func getStateFromHSM() *SMData {
 			log.Printf("Sm Inventory request %s failed: %v", url, err)
 			return nil
 		}
-		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
-
-		var ethIfaces []sm.CompEthInterfaceV2
-
 		ce, err = ioutil.ReadAll(r.Body)
+		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
+		if err != nil {
+			log.Printf("Failed to read response body: %v", err)
+			return nil
+		}
+		debugf("Response: %v", string(ce))
+		var ethIfaces []sm.CompEthInterfaceV2
 		err = json.Unmarshal(ce, &ethIfaces)
+		if err != nil {
+			log.Printf("Failed to unmarshal response body: %v", err)
+			return nil
+		}
 		r.Body.Close()
 
 		addresses := make(map[string]sm.CompEthInterfaceV2)
