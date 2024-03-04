@@ -91,6 +91,11 @@ func TestSMAuthEnabled(retryCount, retryInterval uint64) (authEnabled bool, err 
 		resp    *http.Response
 	)
 
+	if smClient == nil {
+		err = fmt.Errorf("smClient nil. Has a connection been opened yet?")
+		return
+	}
+
 	// If this endpoint is protected (querying it returns a 401),
 	// auth is enabled.
 	testURL, err = url.JoinPath(smBaseURL, hsmTestEP)
@@ -134,6 +139,9 @@ func TestSMProtectedAccess() error {
 
 	if accessToken == "" {
 		return fmt.Errorf("Access token is empty")
+	}
+	if smClient == nil {
+		return fmt.Errorf("smClient nil. Has a connection been opened yet?")
 	}
 
 	testURL, err := url.JoinPath(smBaseURL, hsmTestEP)
