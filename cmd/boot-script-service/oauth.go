@@ -293,6 +293,8 @@ func JWTIsValid(jwtStr string) (jwtValid bool, reason, err error) {
 	// fields.
 	// TODO: Add full validation.
 	reason = jwt.Validate(token, jwt.WithClock(nowClock{}))
+	debugf("JWT valid between %v and %v", token.NotBefore(), token.Expiration())
+	debugf("Current time: %v", time.Now())
 	if reason == nil {
 		jwtValid = true
 	} else {
