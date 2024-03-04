@@ -112,6 +112,7 @@ func TestSMAuthEnabled(retryCount, retryInterval uint64) (authEnabled bool, err 
 			time.Sleep(retryDuration)
 			continue
 		}
+		log.Printf("Connected to %s on attempt %d", testURL, retry+1)
 		if resp.StatusCode == 401 {
 			authEnabled = true
 		} else {
