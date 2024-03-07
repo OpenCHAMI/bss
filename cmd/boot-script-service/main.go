@@ -480,7 +480,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Access to SM service %s failed: %v\n", hsmBase, err)
 	}
-	log.Printf("Access Token: %v\n", accessToken)
 
 	notifier = newNotifier(serviceName, nfdBase+"/hmi/v1/subscribe", getNotifierURL(), svcOpts)
 
