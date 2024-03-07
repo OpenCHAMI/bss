@@ -421,6 +421,8 @@ func main() {
 	}
 	parseCmdLine()
 
+	dumb := someFuncDoesNotExist()
+
 	sn, snerr := base.GetServiceInstanceName()
 	if snerr == nil {
 		serviceName = sn
