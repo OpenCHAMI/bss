@@ -84,7 +84,7 @@ ENV BSS_HSM_RETRIEVAL_DELAY=10
 # Base URL of the OAuth2 server public endpoints to use for non-admin requests
 # like a client (e.g. BSS) requesting an access token after it has been
 # authorized.
-# BSS_OAUTH2_USER_BASE_URL=http://127/0/0/1:4444
+# BSS_OAUTH2_USER_BASE_URL=http://127.0.0.1:4444
 
 # Etcd variables with default values:
 #
