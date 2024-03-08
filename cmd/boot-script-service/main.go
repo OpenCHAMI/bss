@@ -53,11 +53,14 @@ import (
 	"github.com/OpenCHAMI/bss/internal/postgres"
 )
 
-const kvDefaultRetryCount uint64 = 10
-const kvDefaultRetryWait uint64 = 5
-const sqlDefaultRetryCount uint64 = 10
-const sqlDefaultRetryWait uint64 = 5
-const authDefaultRetryCount uint64 = 10
+const (
+	kvDefaultRetryCount   uint64 = 10
+	kvDefaultRetryWait    uint64 = 5
+	sqlDefaultRetryCount  uint64 = 10
+	sqlDefaultRetryWait   uint64 = 5
+	authDefaultRetryCount uint64 = 10
+	authDefaultRetryWait  uint64 = 5
+)
 
 var (
 	httpListen    = ":27778"
@@ -84,22 +87,23 @@ var (
 	// TODO: Set the default to a well known link local address when we have it.
 	// This will also mean we change the virtual service into an Ingress with
 	// this well known IP.
-	advertiseAddress  = "" // i.e. http://{IP to reach this service}
-	insecure          = false
-	debugFlag         = false
-	kvstore           hmetcd.Kvi
-	retryDelay        = uint(30)
-	hsmRetrievalDelay = uint(10)
-	sqlRetryCount     = sqlDefaultRetryCount
-	sqlRetryWait      = sqlDefaultRetryWait
-	notifier          *ScnNotifier
-	useSQL            = false // Use ETCD by default
-	authRetryCount    = authDefaultRetryCount
-	jwksURL           = ""
-	accessToken       = ""
-	sqlDbOpts         = ""
-	spireServiceURL   = "https://spire-tokens.spire:54440"
-	oauth2BaseURL      = "http://127.0.0.1:4444"
+	advertiseAddress    = "" // i.e. http://{IP to reach this service}
+	insecure            = false
+	debugFlag           = false
+	kvstore             hmetcd.Kvi
+	retryDelay          = uint(30)
+	hsmRetrievalDelay   = uint(10)
+	sqlRetryCount       = sqlDefaultRetryCount
+	sqlRetryWait        = sqlDefaultRetryWait
+	notifier            *ScnNotifier
+	useSQL              = false // Use ETCD by default
+	authRetryCount      = authDefaultRetryCount
+	authRetryWait       = authDefaultRetryWait
+	jwksURL             = ""
+	sqlDbOpts           = ""
+	spireServiceURL     = "https://spire-tokens.spire:54440"
+	oauth2AdminBaseURL  = "http://127.0.0.1:4445"
+	oauth2PublicBaseURL = "http://127.0.0.1:4444"
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
@@ -304,13 +308,21 @@ func parseEnvVars() error {
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_AUTH_RETRY_COUNT: %q", parseErr))
 	}
+	parseErr = parseEnv("BSS_AUTH_RETRY_WAIT", &authRetryWait)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_AUTH_RETRY_WAIT: %q", parseErr))
+	}
 	parseErr = parseEnv("BSS_JWKS_URL", &jwksURL)
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_JWKS_URL: %q", parseErr))
 	}
-	parseErr = parseEnv("BSS_OAUTH2_BASE_URL", &oauth2BaseURL)
+	parseErr = parseEnv("BSS_OAUTH2_ADMIN_BASE_URL", &oauth2AdminBaseURL)
 	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("BSS_OAUTH2_BASE_URL: %q", parseErr))
+		errList = append(errList, fmt.Errorf("BSS_OAUTH2_ADMIN_BASE_URL: %q", parseErr))
+	}
+	parseErr = parseEnv("BSS_OAUTH2_PUBLIC_BASE_URL", &oauth2PublicBaseURL)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_OAUTH2_PUBLIC_BASE_URL: %q", parseErr))
 	}
 
 	//
@@ -407,7 +419,8 @@ func parseCmdLine() {
 	flag.StringVar(&sqlUser, "postgres-username", sqlUser, "(BSS_DBUSER) Postgres username")
 	flag.StringVar(&sqlPass, "postgres-password", sqlPass, "(BSS_DBPASS) Postgres password")
 	flag.StringVar(&jwksURL, "jwks-url", jwksURL, "(BSS_JWKS_URL) Set the JWKS URL to fetch the public key for authorization (enables authentication)")
-	flag.StringVar(&oauth2BaseURL, "oauth2-base-url", oauth2BaseURL, "(BSS_OAUTH2_BASE_URL) Base URL of the OAUTH2 server for client authorizations")
+	flag.StringVar(&oauth2AdminBaseURL, "oauth2-admin-base-url", oauth2AdminBaseURL, "(BSS_OAUTH2_ADMIN_BASE_URL) Base URL of the OAUTH2 server admin endpoints for client authorizations")
+	flag.StringVar(&oauth2PublicBaseURL, "oauth2-public-base-url", oauth2PublicBaseURL, "(BSS_OAUTH2_PUBLIC_BASE_URL) Base URL of the OAUTH2 server public endpoints (e.g. for token grants)")
 	flag.BoolVar(&insecure, "insecure", insecure, "(BSS_INSECURE) Don't enforce https certificate security")
 	flag.BoolVar(&debugFlag, "debug", debugFlag, "(BSS_DEBUG) Enable debug output")
 	flag.BoolVar(&useSQL, "postgres", useSQL, "(BSS_USESQL) Use Postgres instead of ETCD")
@@ -415,6 +428,7 @@ func parseCmdLine() {
 	flag.UintVar(&hsmRetrievalDelay, "hsm-retrieval-delay", hsmRetrievalDelay, "(BSS_HSM_RETRIEVAL_DELAY) SM Retrieval delay in seconds")
 	flag.UintVar(&sqlPort, "postgres-port", sqlPort, "(BSS_DBPORT) Postgres port")
 	flag.Uint64Var(&authRetryCount, "auth-retry-count", authRetryCount, "(BSS_AUTH_RETRY_COUNT) Retry fetching JWKS public key set")
+	flag.Uint64Var(&authRetryWait, "auth-retry-wait", authRetryWait, "(BSS_AUTH_RETRY_WAIT) Interval in seconds between authentication request attempts")
 	flag.Uint64Var(&sqlRetryCount, "postgres-retry-count", sqlRetryCount, "(BSS_SQL_RETRY_COUNT) Amount of times to retry connecting to Postgres")
 	flag.Uint64Var(&sqlRetryWait, "postgres-retry-wait", sqlRetryCount, "(BSS_SQL_RETRY_WAIT) Interval in seconds between connection attempts to Postgres")
 	flag.Parse()
@@ -449,21 +463,6 @@ func main() {
 			break
 		}
 	}
-	// register oauth2 client and receive token
-	var client OAuthClient
-	_, err = client.CreateOAuthClient(oauth2BaseURL+"/admin/clients")
-	if err != nil {
-		log.Fatalf("failed to register OAuth client: %v", err)
-	}
-	_, err = client.AuthorizeOAuthClient(oauth2BaseURL+"/oauth2/auth")
-	if err != nil {
-		log.Fatalf("failed to authorize OAuth client: %v", err)
-	}
-	accessToken, err = client.PerformTokenGrant(oauth2BaseURL+"/oauth2/token")
-	if err != nil {
-		log.Fatalf("failed to fetch token from authorization server: %v", err)
-	}
-	log.Printf("Access Token: %v\n", accessToken)
 
 	var svcOpts string
 	if insecure {

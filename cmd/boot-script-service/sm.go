@@ -49,8 +49,11 @@ import (
 	"github.com/OpenCHAMI/smd/v2/pkg/sm"
 )
 
-const badMAC = "not available"
-const undefinedMAC = "ff:ff:ff:ff:ff:ff"
+const (
+	badMAC       = "not available"
+	undefinedMAC = "ff:ff:ff:ff:ff:ff"
+	hsmTestEP    = "/Inventory/RedfishEndpoints"
+)
 
 type SMComponent struct {
 	base.Component
@@ -67,7 +70,7 @@ type SMData struct {
 var (
 	smMutex     sync.Mutex
 	smData      *SMData
-	smClient    *http.Client
+	smClient    *OAuthClient
 	smDataMap   map[string]SMComponent
 	smBaseURL   string
 	smJSONFile  string
@@ -80,6 +83,85 @@ func makeSmMap(state *SMData) map[string]SMComponent {
 		m[v.ID] = v
 	}
 	return m
+}
+
+func TestSMAuthEnabled(retryCount, retryInterval uint64) (authEnabled bool, err error) {
+	var (
+		testURL string
+		resp    *http.Response
+	)
+
+	if smClient == nil {
+		err = fmt.Errorf("smClient nil. Has a connection been opened yet?")
+		return
+	}
+
+	// If this endpoint is protected (querying it returns a 401),
+	// auth is enabled.
+	testURL, err = url.JoinPath(smBaseURL, hsmTestEP)
+	if err != nil {
+		err = fmt.Errorf("Could not join URL paths %q and %q: %v", smBaseURL, hsmTestEP, err)
+		return
+	}
+
+	retryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", retryInterval))
+	if err != nil {
+		err = fmt.Errorf("Invalid retry interval: %v", err)
+		return
+	}
+	for retry := uint64(0); retry < retryCount; retry++ {
+		log.Printf("Attempting connection to %s (attempt %d/%d)", testURL, retry+1, retryCount)
+		resp, err = smClient.Get(testURL)
+		if err != nil {
+			err = fmt.Errorf("Could not GET %q: %v", testURL, err)
+			time.Sleep(retryDuration)
+			continue
+		}
+		log.Printf("Connected to %s on attempt %d", testURL, retry+1)
+		if resp.StatusCode == 401 {
+			authEnabled = true
+		} else {
+			authEnabled = false
+		}
+
+		return
+	}
+
+	err = fmt.Errorf("Number of retries (%d) exhausted when testing if SMD auth is enabled", retryCount)
+	return
+}
+
+func TestSMProtectedAccess() error {
+	var (
+		req *http.Request
+		res *http.Response
+	)
+
+	if accessToken == "" {
+		return fmt.Errorf("Access token is empty")
+	}
+	if smClient == nil {
+		return fmt.Errorf("smClient nil. Has a connection been opened yet?")
+	}
+
+	testURL, err := url.JoinPath(smBaseURL, hsmTestEP)
+	if err != nil {
+		err = fmt.Errorf("Could not join URL paths %q and %q: %v", smBaseURL, hsmTestEP, err)
+		return err
+	}
+
+	req, err = http.NewRequest(http.MethodGet, testURL, nil)
+	headers := map[string][]string{
+		"Authorization": {"Bearer " + accessToken},
+	}
+	req.Header = headers
+	res, err = smClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("Could not execute request: %v")
+	}
+	defer res.Body.Close()
+
+	return nil
 }
 
 func SmOpen(base, options string) error {
@@ -125,7 +207,7 @@ func SmOpen(base, options string) error {
 		}
 	}
 	// Using the Datastore service
-	smClient = new(http.Client)
+	smClient = new(OAuthClient)
 	if https && insecure {
 		tcfg := new(tls.Config)
 		tcfg.InsecureSkipVerify = true
@@ -136,6 +218,19 @@ func SmOpen(base, options string) error {
 	}
 	smBaseURL = base + "/hsm/v2"
 	log.Printf("Accessing state manager via %s\n", smBaseURL)
+
+	var smAuthEnabled bool
+	smAuthEnabled, err = TestSMAuthEnabled(authRetryCount, authRetryWait)
+	if err != nil {
+		return fmt.Errorf("Failed testing if HSM auth is enabled: %v", err)
+	}
+	if smAuthEnabled {
+		log.Printf("HSM authenticated endpoints enabled, checking token")
+		err = smClient.JWTTestAndRefresh()
+		if err != nil {
+			return fmt.Errorf("Failed refreshing JWT: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -183,6 +278,23 @@ func ensureLegalMAC(mac string) string {
 
 func getStateFromHSM() *SMData {
 	if smClient != nil {
+		var headers map[string][]string
+		var body []byte
+		authEnabled, err := TestSMAuthEnabled(authRetryCount, authRetryWait)
+		if err != nil {
+			log.Printf("Failed to test if SM auth is enabled: %v")
+			return nil
+		}
+		if authEnabled {
+			err = smClient.JWTTestAndRefresh()
+			if err != nil {
+				log.Printf("Failed to refresh JWT: %v", err)
+				return nil
+			}
+			headers = map[string][]string{
+				"Authorization": {"Bearer " + accessToken},
+			}
+		}
 		log.Printf("Retrieving state info from %s", smBaseURL)
 		url := smBaseURL + "/State/Components?type=Node"
 		debugf("url: %s, smClient: %v\n", url, smClient)
@@ -191,16 +303,29 @@ func getStateFromHSM() *SMData {
 			log.Printf("Failed to create HTTP request for '%s': %v", url, rerr)
 			return nil
 		}
+		if authEnabled {
+			req.Header = headers
+		}
 		req.Close = true
 		base.SetHTTPUserAgent(req, serviceName)
 		r, err := smClient.Do(req)
+		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
 		if err != nil {
 			log.Printf("Sm State request %s failed: %v", url, err)
 			return nil
 		}
-		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
 		var comps SMData
-		err = json.NewDecoder(r.Body).Decode(&comps)
+		body, err = ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Failed to read response body: %v", err)
+			return nil
+		}
+		debugf("Response: %v", string(body))
+		err = json.Unmarshal(body, &comps)
+		if err != nil {
+			log.Printf("Failed to unmarshal response body: %v", err)
+			return nil
+		}
 		r.Body.Close()
 		// Set up an indexing map to speed up lookup of components in the list
 		compsIndex := make(map[string]int, len(comps.Components))
@@ -210,22 +335,35 @@ func getStateFromHSM() *SMData {
 
 		url = smBaseURL + "/Inventory/ComponentEndpoints?type=Node"
 		req, rerr = http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
+		if rerr != nil {
 			log.Printf("Failed to create HTTP request for '%s': %v", url, rerr)
 			return nil
+		}
+		if authEnabled {
+			req.Header = headers
 		}
 		req.Close = true
 		base.SetHTTPUserAgent(req, serviceName)
 		r, err = smClient.Do(req)
+		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
 		if err != nil {
 			log.Printf("Sm Inventory request %s failed: %v", url, err)
 			return nil
 		}
 		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
 		var ep sm.ComponentEndpointArray
-		ce, err := ioutil.ReadAll(r.Body)
+		var ce []byte
+		ce, err = ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Failed to read response body: %v", err)
+			return nil
+		}
+		debugf("Response: %v", string(ce))
 		err = json.Unmarshal(ce, &ep)
-		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
+		if err != nil {
+			log.Printf("Failed to unmarshal response body: %v", err)
+			return nil
+		}
 		r.Body.Close()
 
 		type myCompEndpt struct {
@@ -277,9 +415,12 @@ func getStateFromHSM() *SMData {
 		//ip address
 		url = smBaseURL + "/Inventory/EthernetInterfaces?type=Node"
 		req, rerr = http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
+		if rerr != nil {
 			log.Printf("Failed to create HTTP request for '%s': %v", url, rerr)
 			return nil
+		}
+		if authEnabled {
+			req.Header = headers
 		}
 		req.Close = true
 		base.SetHTTPUserAgent(req, serviceName)
@@ -288,12 +429,19 @@ func getStateFromHSM() *SMData {
 			log.Printf("Sm Inventory request %s failed: %v", url, err)
 			return nil
 		}
-		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
-
-		var ethIfaces []sm.CompEthInterfaceV2
-
 		ce, err = ioutil.ReadAll(r.Body)
+		debugf("getStateFromHSM(): GET %s -> r: %v, err: %v\n", url, r, err)
+		if err != nil {
+			log.Printf("Failed to read response body: %v", err)
+			return nil
+		}
+		debugf("Response: %v", string(ce))
+		var ethIfaces []sm.CompEthInterfaceV2
 		err = json.Unmarshal(ce, &ethIfaces)
+		if err != nil {
+			log.Printf("Failed to unmarshal response body: %v", err)
+			return nil
+		}
 		r.Body.Close()
 
 		addresses := make(map[string]sm.CompEthInterfaceV2)
