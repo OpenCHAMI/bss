@@ -69,6 +69,22 @@ ENV BSS_HSM_RETRIEVAL_DELAY=10
 #
 # URL of SPIRE token service (not necessary to run BSS).
 # SPIRE_TOKEN_URL=https://spire-tokens.spire:54440
+#
+# URL of JSON Web Key Set (JWKS) server to use for verifying JWTs.
+# When this is set, JWT authentication is enabled. Otherwise, it
+# is disabled.
+# BSS_JWKS_URL=""
+#
+# Base URL of the Oauth2 server admin endpoints to use for client authorizations
+# when JWT authentication is enabled. This is used to authorize BSS via a client
+# credentials grant to be able to communicate with protected SMD endpoints when
+# it is queried for a boot script.
+# BSS_OAUTH2_ADMIN_BASE_URL=http://127.0.0.1:4445
+#
+# Base URL of the OAuth2 server public endpoints to use for non-admin requests
+# like a client (e.g. BSS) requesting an access token after it has been
+# authorized.
+# BSS_OAUTH2_USER_BASE_URL=http://127.0.0.1:4444
 
 # Etcd variables with default values:
 #
