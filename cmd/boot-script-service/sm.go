@@ -157,7 +157,7 @@ func TestSMProtectedAccess() error {
 	req.Header = headers
 	res, err = smClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("Could not execute request: %v")
+		return fmt.Errorf("Could not execute request: %v", err)
 	}
 	defer res.Body.Close()
 
@@ -282,7 +282,7 @@ func getStateFromHSM() *SMData {
 		var body []byte
 		authEnabled, err := TestSMAuthEnabled(authRetryCount, authRetryWait)
 		if err != nil {
-			log.Printf("Failed to test if SM auth is enabled: %v")
+			log.Printf("Failed to test if SM auth is enabled: %v", err)
 			return nil
 		}
 		if authEnabled {

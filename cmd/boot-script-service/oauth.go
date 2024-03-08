@@ -239,7 +239,7 @@ func (client *OAuthClient) PollClientCreds(retryCount, retryInterval uint64) err
 		return nil
 	}
 	log.Printf("Exhausted attempts to obtain client credentials and token")
-	return fmt.Errorf("Exhausted %d attempts at obtaining client credentials and token")
+	return fmt.Errorf("Exhausted %d attempts at obtaining client credentials and token", retryCount)
 }
 
 // JWTTestAndRefresh tests the current JWT. If either a parsing error occurs
