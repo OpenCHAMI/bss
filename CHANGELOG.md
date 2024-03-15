@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.1] - 2024-03-15
+
+- Remove client authorization from client credentials auth flow (not needed)
+
 ## [1.30.0] - 2024-03-07
 
 - Add support for sending authenticated requests to SMD using a JWT
