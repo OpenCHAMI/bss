@@ -91,39 +91,6 @@ func (client *OAuthClient) CreateOAuthClient(registerUrl string) ([]byte, error)
 	return b, nil
 }
 
-func (client *OAuthClient) AuthorizeOAuthClient(authorizeUrl string) ([]byte, error) {
-	// encode ID and secret for authorization header basic authentication
-	// basicAuth := base64.StdEncoding.EncodeToString(
-	// 	[]byte(fmt.Sprintf("%s:%s",
-	// 		url.QueryEscape(client.Id),
-	// 		url.QueryEscape(client.Secret),
-	// 	)),
-	// )
-	body := []byte("grant_type=client_credentials&scope=read&client_id=" + client.Id +
-		"&client_secret=" + client.Secret +
-		"&redirect_uri=" + url.QueryEscape("http://hydra:5555/callback") +
-		"&response_type=token" +
-		"&state=12345678910",
-	)
-	headers := map[string][]string{
-		"Authorization": {"Bearer " + client.RegistrationAccessToken},
-		"Content-Type":  {"application/x-www-form-urlencoded"},
-	}
-
-	req, err := http.NewRequest(http.MethodPost, authorizeUrl, bytes.NewBuffer(body))
-	req.Header = headers
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %v", err)
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to do request: %v", err)
-	}
-	defer res.Body.Close()
-
-	return io.ReadAll(res.Body)
-}
-
 func (client *OAuthClient) PerformTokenGrant(remoteUrl string) (string, error) {
 	// hydra endpoint: /oauth/token
 	body := "grant_type=" + url.QueryEscape("client_credentials") +
@@ -192,17 +159,6 @@ func (client *OAuthClient) RequestClientCreds() (accessToken string, err error) 
 	}
 	log.Printf("Successfully registered OAuth2 client")
 	debugf("Client ID: %s", client.Id)
-
-	url = oauth2PublicBaseURL + "/oauth2/auth"
-	log.Printf("Attempting to authorize OAuth2 client")
-	debugf("Sending request to %s", url)
-	_, err = client.AuthorizeOAuthClient(url)
-	if err != nil {
-		err = fmt.Errorf("Failed to authorize OAuth2 client: %v", err)
-		debugf("Response: %v", string(resp))
-		return
-	}
-	log.Printf("Successfully authorized OAuth2 client")
 
 	url = oauth2PublicBaseURL + "/oauth2/token"
 	log.Printf("Attempting to fetch token from authorization server")
