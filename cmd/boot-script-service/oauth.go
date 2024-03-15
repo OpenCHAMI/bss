@@ -193,7 +193,7 @@ func (client *OAuthClient) RequestClientCreds() (accessToken string, err error) 
 	log.Printf("Successfully registered OAuth2 client")
 	debugf("Client ID: %s", client.Id)
 
-	url = oauth2AdminBaseURL + "/oauth2/auth"
+	url = oauth2PublicBaseURL + "/oauth2/auth"
 	log.Printf("Attempting to authorize OAuth2 client")
 	debugf("Sending request to %s", url)
 	_, err = client.AuthorizeOAuthClient(url)
