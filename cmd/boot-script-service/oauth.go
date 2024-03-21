@@ -24,7 +24,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/go-chi/jwtauth"
+	"github.com/go-chi/v5/jwtauth"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"

@@ -36,7 +36,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -45,8 +44,6 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
 )
 
 const (
