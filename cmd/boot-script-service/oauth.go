@@ -15,6 +15,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,9 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-chi/jwtauth"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
@@ -49,6 +53,29 @@ type nowClock struct {
 // the jwt.Clock interface to do it.
 func (nc nowClock) Now() time.Time {
 	return time.Now()
+}
+
+func fetchPublicKey(url string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	set, err := jwk.Fetch(ctx, url)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+	for it := set.Iterate(context.Background()); it.Next(context.Background()); {
+		pair := it.Pair()
+		key := pair.Value.(jwk.Key)
+
+		var rawkey interface{}
+		if err := key.Raw(&rawkey); err != nil {
+			continue
+		}
+
+		tokenAuth = jwtauth.New(jwa.RS256.String(), nil, rawkey)
+		return nil
+	}
+
+	return fmt.Errorf("failed to load public key: %v", err)
 }
 
 func (client *OAuthClient) CreateOAuthClient(registerUrl string) ([]byte, error) {
@@ -89,6 +116,39 @@ func (client *OAuthClient) CreateOAuthClient(registerUrl string) ([]byte, error)
 	client.Secret = rjson["client_secret"].(string)
 	client.RegistrationAccessToken = rjson["registration_access_token"].(string)
 	return b, nil
+}
+
+func (client *OAuthClient) AuthorizeOAuthClient(authorizeUrl string) ([]byte, error) {
+	// encode ID and secret for authorization header basic authentication
+	// basicAuth := base64.StdEncoding.EncodeToString(
+	// 	[]byte(fmt.Sprintf("%s:%s",
+	// 		url.QueryEscape(client.Id),
+	// 		url.QueryEscape(client.Secret),
+	// 	)),
+	// )
+	body := []byte("grant_type=client_credentials&scope=read&client_id=" + client.Id +
+		"&client_secret=" + client.Secret +
+		"&redirect_uri=" + url.QueryEscape("http://hydra:5555/callback") +
+		"&response_type=token" +
+		"&state=12345678910",
+	)
+	headers := map[string][]string{
+		"Authorization": {"Bearer " + client.RegistrationAccessToken},
+		"Content-Type":  {"application/x-www-form-urlencoded"},
+	}
+
+	req, err := http.NewRequest(http.MethodPost, authorizeUrl, bytes.NewBuffer(body))
+	req.Header = headers
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to do request: %v", err)
+	}
+	defer res.Body.Close()
+
+	return io.ReadAll(res.Body)
 }
 
 func (client *OAuthClient) PerformTokenGrant(remoteUrl string) (string, error) {
@@ -143,32 +203,38 @@ func QuoteArrayStrings(arr []string) []string {
 // Returns the OAuthClient struct containing the client ID, secret, etc. as well
 // as the access token and an error if one occurred.
 func (client *OAuthClient) RequestClientCreds() (accessToken string, err error) {
-	var (
-		url  string
-		resp []byte
-	)
+	return client.FetchAccessToken(oauth2AdminBaseURL + "/admin/clients")
+	// log.Printf("Attempting to register OAuth2 client")
+	// debugf("Sending request to %s", url)
+	// resp, err = client.CreateOAuthClient(url)
+	// if err != nil {
+	// 	err = fmt.Errorf("Failed to register OAuth2 client: %v", err)
+	// 	debugf("Response: %v", string(resp))
+	// 	return
+	// }
+	// log.Printf("Successfully registered OAuth2 client")
+	// debugf("Client ID: %s", client.Id)
 
-	url = oauth2AdminBaseURL + "/admin/clients"
-	log.Printf("Attempting to register OAuth2 client")
-	debugf("Sending request to %s", url)
-	resp, err = client.CreateOAuthClient(url)
-	if err != nil {
-		err = fmt.Errorf("Failed to register OAuth2 client: %v", err)
-		debugf("Response: %v", string(resp))
-		return
-	}
-	log.Printf("Successfully registered OAuth2 client")
-	debugf("Client ID: %s", client.Id)
+	// url = oauth2AdminBaseURL + "/oauth2/auth"
+	// log.Printf("Attempting to authorize OAuth2 client")
+	// debugf("Sending request to %s", url)
+	// _, err = client.AuthorizeOAuthClient(url)
+	// if err != nil {
+	// 	err = fmt.Errorf("Failed to authorize OAuth2 client: %v", err)
+	// 	debugf("Response: %v", string(resp))
+	// 	return
+	// }
+	// log.Printf("Successfully authorized OAuth2 client")
 
-	url = oauth2PublicBaseURL + "/oauth2/token"
-	log.Printf("Attempting to fetch token from authorization server")
-	debugf("Sending request to %s", url)
-	accessToken, err = client.PerformTokenGrant(url)
-	if err != nil {
-		err = fmt.Errorf("Failed to fetch token from authorization server: %v", err)
-		return
-	}
-	log.Printf("Successfully fetched token")
+	// url = oauth2PublicBaseURL + "/oauth2/token"
+	// log.Printf("Attempting to fetch token from authorization server")
+	// debugf("Sending request to %s", url)
+	// accessToken, err = client.PerformTokenGrant(url)
+	// if err != nil {
+	// 	err = fmt.Errorf("Failed to fetch token from authorization server: %v", err)
+	// 	return
+	// }
+	// log.Printf("Successfully fetched token")
 
 	return
 }
@@ -258,4 +324,34 @@ func JWTIsValid(jwtStr string) (jwtValid bool, reason, err error) {
 	}
 
 	return
+}
+
+func (client *OAuthClient) FetchAccessToken(remoteUrl string) (string, error) {
+	// opaal endpoint: /token
+	headers := map[string][]string{
+		"no-browser": {},
+	}
+	req, err := http.NewRequest(http.MethodPost, remoteUrl, nil)
+	req.Header = headers
+	if err != nil {
+		return "", fmt.Errorf("failed to make request: %s", err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to do request: %v", err)
+	}
+	defer res.Body.Close()
+
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	var rjson map[string]any
+	err = json.Unmarshal(b, &rjson)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal response body: %v", err)
+	}
+
+	return rjson["access_token"].(string), nil
 }

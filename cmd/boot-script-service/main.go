@@ -453,7 +453,7 @@ func main() {
 	// try and fetch JWKS from issuer
 	if jwksURL != "" {
 		for i := uint64(0); i <= authRetryCount; i++ {
-			err := loadPublicKeyFromURL(jwksURL)
+			err := fetchPublicKey(jwksURL)
 			if err != nil {
 				log.Printf("failed to initialize auth token: %v", err)
 				time.Sleep(5 * time.Second)

@@ -62,29 +62,6 @@ var (
 	tokenAuth *jwtauth.JWTAuth
 )
 
-func loadPublicKeyFromURL(url string) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	set, err := jwk.Fetch(ctx, url)
-	if err != nil {
-		return fmt.Errorf("%v", err)
-	}
-	for it := set.Iterate(context.Background()); it.Next(context.Background()); {
-		pair := it.Pair()
-		key := pair.Value.(jwk.Key)
-
-		var rawkey interface{}
-		if err := key.Raw(&rawkey); err != nil {
-			continue
-		}
-
-		tokenAuth = jwtauth.New(jwa.RS256.String(), nil, rawkey)
-		return nil
-	}
-
-	return fmt.Errorf("failed to load public key: %v", err)
-}
-
 func initHandlers() *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
