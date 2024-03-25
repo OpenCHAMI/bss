@@ -15,6 +15,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,9 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-chi/jwtauth/v5"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
@@ -49,6 +53,30 @@ type nowClock struct {
 // the jwt.Clock interface to do it.
 func (nc nowClock) Now() time.Time {
 	return time.Now()
+}
+
+// fetchPublicKey fetches the JWKS (JSON Key Set) needed to verify JWTs with issuer.
+func fetchPublicKey(url string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	set, err := jwk.Fetch(ctx, url)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+	for it := set.Iterate(context.Background()); it.Next(context.Background()); {
+		pair := it.Pair()
+		key := pair.Value.(jwk.Key)
+
+		var rawkey interface{}
+		if err := key.Raw(&rawkey); err != nil {
+			continue
+		}
+
+		tokenAuth = jwtauth.New(jwa.RS256.String(), nil, rawkey)
+		return nil
+	}
+
+	return fmt.Errorf("failed to load public key: %v", err)
 }
 
 func (client *OAuthClient) CreateOAuthClient(registerUrl string) ([]byte, error) {
@@ -123,6 +151,11 @@ func (client *OAuthClient) PerformTokenGrant(remoteUrl string) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal response body: %v", err)
 	}
 
+	accessToken := rjson["access_token"]
+	if accessToken == nil {
+		return "", fmt.Errorf("no access token found")
+	}
+
 	return rjson["access_token"].(string), nil
 }
 
@@ -131,46 +164,6 @@ func QuoteArrayStrings(arr []string) []string {
 		arr[i] = "\"" + v + "\""
 	}
 	return arr
-}
-
-// RequestClientCreds performs the requests to the OAuth2 server to obtain an
-// access token for this client (BSS).
-//
-// 1. Register as OAuth2 client.
-// 2. Authorize OAuth2 client that was created.
-// 3. Obtain access token if OAuth2 client is authorized.
-//
-// Returns the OAuthClient struct containing the client ID, secret, etc. as well
-// as the access token and an error if one occurred.
-func (client *OAuthClient) RequestClientCreds() (accessToken string, err error) {
-	var (
-		url  string
-		resp []byte
-	)
-
-	url = oauth2AdminBaseURL + "/admin/clients"
-	log.Printf("Attempting to register OAuth2 client")
-	debugf("Sending request to %s", url)
-	resp, err = client.CreateOAuthClient(url)
-	if err != nil {
-		err = fmt.Errorf("Failed to register OAuth2 client: %v", err)
-		debugf("Response: %v", string(resp))
-		return
-	}
-	log.Printf("Successfully registered OAuth2 client")
-	debugf("Client ID: %s", client.Id)
-
-	url = oauth2PublicBaseURL + "/oauth2/token"
-	log.Printf("Attempting to fetch token from authorization server")
-	debugf("Sending request to %s", url)
-	accessToken, err = client.PerformTokenGrant(url)
-	if err != nil {
-		err = fmt.Errorf("Failed to fetch token from authorization server: %v", err)
-		return
-	}
-	log.Printf("Successfully fetched token")
-
-	return
 }
 
 // PollClientCreds tries retryCount times every retryInterval seconds to request
@@ -184,7 +177,7 @@ func (client *OAuthClient) PollClientCreds(retryCount, retryInterval uint64) err
 	}
 	for i := uint64(0); i < retryCount; i++ {
 		log.Printf("Attempting to obtain access token (attempt %d/%d)", i+1, retryCount)
-		token, err := client.RequestClientCreds()
+		token, err := client.FetchAccessToken(oauth2AdminBaseURL + "/token")
 		if err != nil {
 			log.Printf("Failed to obtain client credentials and token: %v", err)
 			time.Sleep(retryDuration)
@@ -258,4 +251,42 @@ func JWTIsValid(jwtStr string) (jwtValid bool, reason, err error) {
 	}
 
 	return
+}
+
+// FetchAccessToken fetches an access token for this client (BSS).
+//
+// Returns the access token string necessary to supply for authorization requests.
+func (client *OAuthClient) FetchAccessToken(remoteUrl string) (string, error) {
+	// opaal endpoint: /token
+	headers := map[string][]string{
+		"no-browser": {},
+	}
+	req, err := http.NewRequest(http.MethodPost, remoteUrl, nil)
+	req.Header = headers
+	if err != nil {
+		return "", fmt.Errorf("failed to make request: %s", err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to do request: %v", err)
+	}
+	defer res.Body.Close()
+
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	var rjson map[string]any
+	err = json.Unmarshal(b, &rjson)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal response body: %v", err)
+	}
+
+	accessToken := rjson["access_token"]
+	if accessToken == nil {
+		return "", fmt.Errorf("no access token found")
+	}
+
+	return rjson["access_token"].(string), nil
 }

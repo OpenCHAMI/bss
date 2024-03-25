@@ -102,8 +102,8 @@ var (
 	jwksURL             = ""
 	sqlDbOpts           = ""
 	spireServiceURL     = "https://spire-tokens.spire:54440"
-	oauth2AdminBaseURL  = "http://127.0.0.1:4445"
-	oauth2PublicBaseURL = "http://127.0.0.1:4444"
+	oauth2AdminBaseURL  = "http://127.0.0.1:3333"
+	oauth2PublicBaseURL = "http://127.0.0.1:3333"
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
@@ -453,7 +453,7 @@ func main() {
 	// try and fetch JWKS from issuer
 	if jwksURL != "" {
 		for i := uint64(0); i <= authRetryCount; i++ {
-			err := loadPublicKeyFromURL(jwksURL)
+			err := fetchPublicKey(jwksURL)
 			if err != nil {
 				log.Printf("failed to initialize auth token: %v", err)
 				time.Sleep(5 * time.Second)
