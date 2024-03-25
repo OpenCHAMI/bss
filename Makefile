@@ -24,6 +24,8 @@
 NAME ?= bss
 VERSION ?= $(shell cat .version)
 BINARIES = boot-script-service bss-init
+GOOS := $(if $(GOOS),$(GOOS),linux)
+GOARCH := $(if $(GOARCH),$(GOARCH),amd64)
 
 
 all : image unittest ct snyk ct_image
@@ -31,7 +33,7 @@ all : image unittest ct snyk ct_image
 binaries: $(BINARIES)
 
 %: cmd/%/*.go
-	GOOS=linux GOARCH=amd64 go build -v -tags musl $(LDFLAGS) -o $@ ./$(dir $<)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -v -tags musl $(LDFLAGS) -o $@ ./$(dir $<)
 
 clean:
 	rm -f $(BINARIES)
