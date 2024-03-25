@@ -55,6 +55,7 @@ func (nc nowClock) Now() time.Time {
 	return time.Now()
 }
 
+// fetchPublicKey fetches the JWKS (JSON Key Set) needed to verify JWTs with issuer.
 func fetchPublicKey(url string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
