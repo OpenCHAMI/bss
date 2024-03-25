@@ -102,8 +102,8 @@ var (
 	jwksURL             = ""
 	sqlDbOpts           = ""
 	spireServiceURL     = "https://spire-tokens.spire:54440"
-	oauth2AdminBaseURL  = "http://127.0.0.1:4445"
-	oauth2PublicBaseURL = "http://127.0.0.1:4444"
+	oauth2AdminBaseURL  = "http://127.0.0.1:3333"
+	oauth2PublicBaseURL = "http://127.0.0.1:3333"
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
