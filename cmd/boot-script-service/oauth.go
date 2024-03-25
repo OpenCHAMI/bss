@@ -176,7 +176,7 @@ func (client *OAuthClient) PollClientCreds(retryCount, retryInterval uint64) err
 	}
 	for i := uint64(0); i < retryCount; i++ {
 		log.Printf("Attempting to obtain access token (attempt %d/%d)", i+1, retryCount)
-		token, err := client.FetchAccessToken(oauth2AdminBaseURL)
+		token, err := client.FetchAccessToken(oauth2AdminBaseURL + "/token")
 		if err != nil {
 			log.Printf("Failed to obtain client credentials and token: %v", err)
 			time.Sleep(retryDuration)
