@@ -252,6 +252,9 @@ func JWTIsValid(jwtStr string) (jwtValid bool, reason, err error) {
 	return
 }
 
+// FetchAccessToken fetches an access token for this client (BSS).
+//
+// Returns the access token string necessary to supply for authorization requests.
 func (client *OAuthClient) FetchAccessToken(remoteUrl string) (string, error) {
 	// opaal endpoint: /token
 	headers := map[string][]string{
