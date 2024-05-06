@@ -41,9 +41,9 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
+	"github.com/OpenCHAMI/jwtauth/v5"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/jwtauth/v5"
 )
 
 const (
