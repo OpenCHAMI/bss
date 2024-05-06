@@ -66,7 +66,7 @@ func fetchPublicKey(url string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JWKS: %v", err)
 	}
-	s.tokenAuth, err = jwtauth.NewKeySet(jwks)
+	tokenAuth, err = jwtauth.NewKeySet(jwks)
 	if err != nil {
 		return fmt.Errorf("failed to initialize JWKS: %v", err)
 	}
