@@ -448,8 +448,6 @@ func main() {
 	}
 	log.Printf("Service %s started", serviceName)
 
-	router := initHandlers()
-
 	// try and fetch JWKS from issuer
 	if jwksURL != "" {
 		for i := uint64(0); i <= authRetryCount; i++ {
@@ -463,6 +461,8 @@ func main() {
 			break
 		}
 	}
+
+	router := initHandlers()
 
 	var svcOpts string
 	if insecure {

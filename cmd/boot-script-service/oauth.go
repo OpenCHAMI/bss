@@ -24,8 +24,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/go-chi/jwtauth/v5"
-	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/OpenCHAMI/jwtauth/v5"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 )
@@ -63,17 +62,13 @@ func fetchPublicKey(url string) error {
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	for it := set.Iterate(context.Background()); it.Next(context.Background()); {
-		pair := it.Pair()
-		key := pair.Value.(jwk.Key)
-
-		var rawkey interface{}
-		if err := key.Raw(&rawkey); err != nil {
-			continue
-		}
-
-		tokenAuth = jwtauth.New(jwa.RS256.String(), nil, rawkey)
-		return nil
+	jwks, err := json.Marshal(set)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JWKS: %v", err)
+	}
+	s.tokenAuth, err = jwtauth.NewKeySet(jwks)
+	if err != nil {
+		return fmt.Errorf("failed to initialize JWKS: %v", err)
 	}
 
 	return fmt.Errorf("failed to load public key: %v", err)
