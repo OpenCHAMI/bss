@@ -17,10 +17,10 @@ require (
 )
 
 require (
+	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
 	github.com/OpenCHAMI/smd/v2 v2.12.15
 	github.com/go-chi/chi v1.5.1
 	github.com/go-chi/chi/v5 v5.0.11
-	github.com/go-chi/jwtauth/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/lestrrat-go/jwx v1.2.28
 )
@@ -53,7 +53,7 @@ require (
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.4 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/jwx/v2 v2.0.17 // indirect
+	github.com/lestrrat-go/jwx/v2 v2.0.20 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -63,9 +63,9 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	go.etcd.io/etcd v3.3.13+incompatible // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/crypto v0.17.0 // indirect
-	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
