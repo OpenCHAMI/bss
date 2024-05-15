@@ -15,7 +15,6 @@ builds:
       - linux
     goarch:
       - amd64
-      - arm64
     no_unique_dist_dir: true
     tags:
       - dynamic
@@ -26,7 +25,6 @@ builds:
       - linux
     goarch:
       - amd64
-      - arm64
     no_unique_dist_dir: true
     tags:
       - dynamic
