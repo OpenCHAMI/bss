@@ -38,6 +38,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	net_url "net/url"
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
@@ -130,6 +131,9 @@ func bootParameters(w http.ResponseWriter, r *http.Request) {
 }
 
 func bootScript(w http.ResponseWriter, r *http.Request) {
+	if bootscriptNotifyURL != "" {
+		go notifyTarget(bootscriptNotifyURL, r.RemoteAddr)
+	}
 	switch r.Method {
 	case http.MethodGet:
 		BootscriptGet(w, r)
@@ -210,4 +214,13 @@ func endpointHistoryGet(w http.ResponseWriter, r *http.Request) {
 	default:
 		sendAllowable(w, "GET")
 	}
+}
+
+func notifyTarget(url string, data string) {
+	resp, err := http.PostForm(url, net_url.Values{"data": {data}})
+	if err != nil {
+		fmt.Printf("Error POSTing to %s: %v\n", url, err)
+		return
+	}
+	defer resp.Body.Close()
 }

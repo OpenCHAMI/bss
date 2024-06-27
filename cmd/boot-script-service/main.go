@@ -104,6 +104,7 @@ var (
 	spireServiceURL     = "https://spire-tokens.spire:54440"
 	oauth2AdminBaseURL  = "http://127.0.0.1:3333"
 	oauth2PublicBaseURL = "http://127.0.0.1:3333"
+	bootscriptNotifyURL = ""
 )
 
 func parseEnv(evar string, v interface{}) (ret error) {
@@ -324,6 +325,10 @@ func parseEnvVars() error {
 	if parseErr != nil {
 		errList = append(errList, fmt.Errorf("BSS_OAUTH2_PUBLIC_BASE_URL: %q", parseErr))
 	}
+	parseErr = parseEnv("BSS_BOOTSCRIPT_NOTIFY_URL", &bootscriptNotifyURL)
+	if parseErr != nil {
+		errList = append(errList, fmt.Errorf("BSS_BOOTSCRIPT_NOTIFY_URL: %q", parseErr))
+	}
 
 	//
 	// Etcd environment variables
@@ -421,6 +426,7 @@ func parseCmdLine() {
 	flag.StringVar(&jwksURL, "jwks-url", jwksURL, "(BSS_JWKS_URL) Set the JWKS URL to fetch the public key for authorization (enables authentication)")
 	flag.StringVar(&oauth2AdminBaseURL, "oauth2-admin-base-url", oauth2AdminBaseURL, "(BSS_OAUTH2_ADMIN_BASE_URL) Base URL of the OAUTH2 server admin endpoints for client authorizations")
 	flag.StringVar(&oauth2PublicBaseURL, "oauth2-public-base-url", oauth2PublicBaseURL, "(BSS_OAUTH2_PUBLIC_BASE_URL) Base URL of the OAUTH2 server public endpoints (e.g. for token grants)")
+	flag.StringVar(&bootscriptNotifyURL, "bootscript-notify-url", bootscriptNotifyURL, "(BSS_BOOTSCRIPT_NOTIFY_URL) Full URL to which newly-booted node IPs should be POSTed (e.g. TPM-manager server)")
 	flag.BoolVar(&insecure, "insecure", insecure, "(BSS_INSECURE) Don't enforce https certificate security")
 	flag.BoolVar(&debugFlag, "debug", debugFlag, "(BSS_DEBUG) Enable debug output")
 	flag.BoolVar(&useSQL, "postgres", useSQL, "(BSS_USESQL) Use Postgres instead of ETCD")
