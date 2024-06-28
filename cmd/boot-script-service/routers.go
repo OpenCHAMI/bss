@@ -37,13 +37,16 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	net_url "net/url"
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
 	"github.com/OpenCHAMI/jwtauth/v5"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 const (
@@ -130,6 +133,9 @@ func bootParameters(w http.ResponseWriter, r *http.Request) {
 }
 
 func bootScript(w http.ResponseWriter, r *http.Request) {
+	if bootscriptNotifyURL != "" {
+		go notifyTarget(bootscriptNotifyURL, r.RemoteAddr)
+	}
 	switch r.Method {
 	case http.MethodGet:
 		BootscriptGet(w, r)
@@ -210,4 +216,13 @@ func endpointHistoryGet(w http.ResponseWriter, r *http.Request) {
 	default:
 		sendAllowable(w, "GET")
 	}
+}
+
+func notifyTarget(url string, data string) {
+	resp, err := retryablehttp.PostForm(url, net_url.Values{"data": {data}})
+	if err != nil {
+		log.Printf("WARNING: HTTP POST of \"%v\" failed: %v\n", data, err)
+		return
+	}
+	defer resp.Body.Close()
 }
