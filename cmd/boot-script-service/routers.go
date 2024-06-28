@@ -221,7 +221,7 @@ func endpointHistoryGet(w http.ResponseWriter, r *http.Request) {
 func notifyTarget(url string, data string) {
 	resp, err := retryablehttp.PostForm(url, net_url.Values{"data": {data}})
 	if err != nil {
-		log.Printf("WARNING: HTTP POST failed: %v\n", err)
+		log.Printf("WARNING: HTTP POST of \"%v\" failed: %v\n", data, err)
 		return
 	}
 	defer resp.Body.Close()
