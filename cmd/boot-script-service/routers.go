@@ -37,6 +37,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	net_url "net/url"
 	"time"
@@ -45,6 +46,7 @@ import (
 	"github.com/OpenCHAMI/jwtauth/v5"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 const (
@@ -217,9 +219,9 @@ func endpointHistoryGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func notifyTarget(url string, data string) {
-	resp, err := http.PostForm(url, net_url.Values{"data": {data}})
+	resp, err := retryablehttp.PostForm(url, net_url.Values{"data": {data}})
 	if err != nil {
-		fmt.Printf("Error POSTing to %s: %v\n", url, err)
+		log.Printf("WARNING: HTTP POST failed: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
