@@ -71,7 +71,7 @@ func fetchPublicKey(url string) error {
 		return fmt.Errorf("failed to initialize JWKS: %v", err)
 	}
 
-	return fmt.Errorf("failed to load public key: %v", err)
+	return nil
 }
 
 func (client *OAuthClient) CreateOAuthClient(registerUrl string) ([]byte, error) {
