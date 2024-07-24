@@ -440,6 +440,15 @@ func BootparametersPost(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("Bad Request: %s", err))
 		return
 	}
+	// Check that MAC address(es) is/are valid format
+	err = args.CheckMacs()
+	if err != nil {
+		// Invalid MAC address format (if included), invalid request
+		LogBootParameters(fmt.Sprintf("/bootparameters POST FAILED: %s", err.Error()), args)
+		base.SendProblemDetailsGeneric(w, http.StatusBadRequest,
+			fmt.Sprintf("Bad Request: %s", err))
+		return
+	}
 	debugf("Received boot parameters: %v\n", args)
 	err, referralToken := StoreNew(args)
 	if err == nil {
