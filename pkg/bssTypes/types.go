@@ -22,6 +22,11 @@
 
 package bssTypes
 
+import (
+	"fmt"
+	"regexp"
+)
+
 type PhoneHome struct {
 	PublicKeyDSA     string `form:"pub_key_dsa" json:"pub_key_dsa" binding:"omitempty"`
 	PublicKeyRSA     string `form:"pub_key_rsa" json:"pub_key_rsa" binding:"omitempty"`
@@ -58,6 +63,21 @@ type BootParams struct {
 	Kernel    string    `json:"kernel,omitempty"`
 	Initrd    string    `json:"initrd,omitempty"`
 	CloudInit CloudInit `json:"cloud-init,omitempty"`
+}
+
+func (bp BootParams) CheckMacs() (err error) {
+	if len(bp.Macs) > 0 {
+		re := regexp.MustCompile(`^([0-9A-Fa-f]{2}:){5}[0-9a-fA-F]{2}$`)
+		for _, mac := range bp.Macs {
+			// If MAC is incorrectly formatted, return error
+			if valid := re.MatchString(mac); !valid {
+				return fmt.Errorf("invalid MAC address format: %s\n", mac)
+			}
+		}
+	}
+
+	// All MACs are correctly format, return nil error
+	return
 }
 
 // The following structures and types all related to the last access information for bootscripts and cloud-init data.
