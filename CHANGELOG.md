@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.7] - 2024-07-17
+
+- Fixed incorrect error returned from fetchPublicKey()
+
+## [1.30.6] - 2024-06-28
+
+- Added POST notification for bootscript requests
+
+## [1.30.5] - 2024-05-15
+
+- Removed arm64 from goreleaser
+
+## [1.30.4] - 2024-05-07
+
+- Updated go mod and sum files
+
+## [1.30.3] - 2024-05-07
+
+- Changed router/JWKS fetch order and use JWKSKeySet for verification
+- Fixed typo
+- Added arm64 builds to Goreleaser
+
 ## [1.30.2] - 2024-03-25
 
 ### Added
