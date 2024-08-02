@@ -31,18 +31,21 @@ BINARIES = boot-script-service bss-init
 GOOS := $(if $(GOOS),$(GOOS),linux)
 GOARCH := $(if $(GOARCH),$(GOARCH),amd64)
 
-all: version binaries
+.PHONY: all
+all: binaries
 
 .PHONY: binaries
-binaries: $(BINARIES)
+binaries: version $(BINARIES)
 
 .PHONY: docker
-container: $(BINARIES)
+container: version $(BINARIES)
 	$(DOCKER) build --tag openchami/bss:$(VERSION)-dirty $(DOCKEROPTS) .
 
+# BSS uses the .version file when printing its version, so we need to
+# update it.
 .PHONY: version
 version:
-	@echo '$(VERSION)' | tr -d v | tee .version
+	echo '$(VERSION)' | tr -d v | tee .version
 
 %: cmd/%/*.go
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -v -tags musl $(LDFLAGS) -o $@ ./$(dir $<)

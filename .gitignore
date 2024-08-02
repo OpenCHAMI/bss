@@ -1,6 +1,7 @@
 kubernetes/.packaged/
 .idea/
 *.swp
+.version
 
 # Prevent certificates from getting checked in
 *.ca
