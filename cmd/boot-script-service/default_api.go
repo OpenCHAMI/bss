@@ -53,6 +53,7 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
+	hmetcd "github.com/Cray-HPE/hms-hmetcd"
 	hms_s3 "github.com/Cray-HPE/hms-s3"
 	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 )
@@ -994,42 +995,65 @@ func DumpstateGet(w http.ResponseWriter, r *http.Request) {
 	var results State
 	state := getState()
 	results.Components = state.Components
-	for _, image := range GetKernelInfo() {
-		var bp bssTypes.BootParams
-		bp.Params = image.Params
-		bp.Kernel = image.Path
-		results.Params = append(results.Params, bp)
-	}
-	for _, image := range GetInitrdInfo() {
-		var bp bssTypes.BootParams
-		bp.Params = image.Params
-		bp.Initrd = image.Path
-		results.Params = append(results.Params, bp)
-	}
+	var err error
+	if useSQL {
+		results.Params, err = bssdb.GetBootParamsAll()
+		if err != nil {
+			log.Printf("DumpStateGet(): GetBootParamsAll(): Could not get boot parameters from SQL DB: %v", err)
+			err = fmt.Errorf("Error retrieving boot parameters from database")
+		}
+	} else {
+		for _, image := range GetKernelInfo() {
+			var bp bssTypes.BootParams
+			bp.Params = image.Params
+			bp.Kernel = image.Path
+			results.Params = append(results.Params, bp)
+		}
+		for _, image := range GetInitrdInfo() {
+			var bp bssTypes.BootParams
+			bp.Params = image.Params
+			bp.Initrd = image.Path
+			results.Params = append(results.Params, bp)
+		}
 
-	kvl, err := getTags()
-	var names []string
-	if err == nil {
-		for _, x := range kvl {
-			name := extractParamName(x)
-			names = append(names, name)
-			var bds BootDataStore
-			if e := json.Unmarshal([]byte(x.Value), &bds); e == nil {
-				bd := bdConvert(bds)
-				var bp bssTypes.BootParams
-				bp.Hosts = append(bp.Hosts, name)
-				bp.Params = bd.Params
-				bp.Kernel = bd.Kernel.Path
-				bp.Initrd = bd.Initrd.Path
-				results.Params = append(results.Params, bp)
+		var (
+			kvl   []hmetcd.Kvi_KV
+			names []string
+		)
+		kvl, err = getTags()
+		if err == nil {
+			for _, x := range kvl {
+				name := extractParamName(x)
+				names = append(names, name)
+				var bds BootDataStore
+				if e := json.Unmarshal([]byte(x.Value), &bds); e == nil {
+					bd := bdConvert(bds)
+					var bp bssTypes.BootParams
+					bp.Hosts = append(bp.Hosts, name)
+					bp.Params = bd.Params
+					bp.Kernel = bd.Kernel.Path
+					bp.Initrd = bd.Initrd.Path
+					results.Params = append(results.Params, bp)
+				} else {
+					debugf("WARNING: Unmarshalling boot data store for name %q and tag %v failed (not including in results): %v", name, x, err)
+				}
 			}
+			debugf("Retrieved names: %v", names)
+			debugf("Retrieved params: %v", results.Params)
+		} else {
+			log.Printf("DumpStateGet(): getTags(): %v", err)
+			err = fmt.Errorf("Error retrieving names from key-value store")
 		}
 	}
-	debugf("Retreived names: %v", names)
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(results)
 	if err != nil {
-		log.Printf("Yikes, I couldn't encode '%v' as a JSON status response: %s\n", results, err)
+		base.SendProblemDetailsGeneric(w, http.StatusInternalServerError,
+			fmt.Sprintf("Retrieving state failed: %v", err))
+	} else {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(results)
+		if err != nil {
+			log.Printf("Yikes, I couldn't encode '%v' as a JSON status response: %s\n", results, err)
+		}
 	}
 }
