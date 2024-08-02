@@ -22,6 +22,7 @@
 
 # Service
 NAME ?= bss
+DOCKER ?= docker
 
 # Version
 BUILD := $(shell git rev-parse --short HEAD)
@@ -36,8 +37,8 @@ all: version binaries
 binaries: $(BINARIES)
 
 .PHONY: docker
-docker: $(BINARIES)
-	docker build --tag openchami/bss:$(VERSION)-dirty .
+container: $(BINARIES)
+	$(DOCKER) build --tag openchami/bss:$(VERSION)-dirty $(DOCKEROPTS) .
 
 .PHONY: version
 version:
