@@ -17,6 +17,6 @@
           - name: Install dependencies
             run: go get ./boot-script-service ./bss-init
           - name: Generate .version
-            run: make version
+            run: make -C ../ version
           - name: Test with the Go CLI
             run: go test ./boot-script-service ./bss-init
