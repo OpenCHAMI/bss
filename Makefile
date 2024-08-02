@@ -26,7 +26,7 @@ DOCKER ?= docker
 
 # Version
 BUILD := $(shell git rev-parse --short HEAD)
-VERSION := $(shell git describe --tags --abbrev=0)
+VERSION := $(shell git describe --tags --always --abbrev=0)
 BINARIES = boot-script-service bss-init
 GOOS := $(if $(GOOS),$(GOOS),linux)
 GOARCH := $(if $(GOARCH),$(GOARCH),amd64)
