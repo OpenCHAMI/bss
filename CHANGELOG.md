@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.1] - 2024-08-05
+
+- Removed unused files and directories from repository
+- Removed reliance on .version file for tagging containers
+  - While not tracked in repository, it is still generated so BSS can fetch its version
+    when the version endpoint is queried
+- Updated Makefile
+  - `git describe` is now used to get version instead of .version file
+  - Replaced `docker` target with `container` and allowed using different container runtime
+  - Added version target to generate .version; used in CI and dependency for all build targets
+  - Got rid of unnecessary targets/recipes
+
 ## [1.31.0] - 2024-07-25
 
 - Added CheckMacs() to BootParams struct to check MAC address format on POST/PUT/PATCH

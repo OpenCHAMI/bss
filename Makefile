@@ -22,36 +22,38 @@
 
 # Service
 NAME ?= bss
-VERSION ?= $(shell cat .version)
+DOCKER ?= docker
+
+# Version
+BUILD := $(shell git rev-parse --short HEAD)
+VERSION := $(shell git describe --tags --always --abbrev=0)
 BINARIES = boot-script-service bss-init
 GOOS := $(if $(GOOS),$(GOOS),linux)
 GOARCH := $(if $(GOARCH),$(GOARCH),amd64)
 
+.PHONY: all
+all: binaries
 
-all : image unittest ct snyk ct_image
+.PHONY: binaries
+binaries: version $(BINARIES)
 
-binaries: $(BINARIES)
+.PHONY: docker
+container: version $(BINARIES)
+	$(DOCKER) build --tag openchami/bss:$(VERSION)-dirty $(DOCKEROPTS) .
+
+# BSS uses the .version file when printing its version, so we need to
+# update it.
+.PHONY: version
+version:
+	echo '$(VERSION)' | tr -d v | tee .version
 
 %: cmd/%/*.go
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -v -tags musl $(LDFLAGS) -o $@ ./$(dir $<)
 
+.PHONY: clean
 clean:
 	rm -f $(BINARIES)
 
-image:
-	docker build ${NO_CACHE} --pull ${DOCKER_ARGS} --tag '${NAME}:${VERSION}' .
-
-unittest:
-	./runUnitTest.sh
-
+.PHONY: snyk
 snyk:
 	./runSnyk.sh
-
-ct:
-	./runCT.sh
-
-ct_image:
-	docker build --no-cache -f test/ct/Dockerfile test/ct/ --tag hms-bss-hmth-test:${VERSION}
-
-docker: $(BINARIES)
-	docker build --tag openchami/bss:v$(VERSION)-dirty $(DOCKEROPTS) .
