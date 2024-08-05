@@ -33,10 +33,10 @@ import (
 )
 
 type serviceStatus struct {
-	Version        string         `json:"bss-version,omitempty"`
-	Status         string         `json:"bss-status,omitempty"`
-	HSMStatus      string         `json:"bss-status-hsm,omitempty"`
-	StorageBackend storageBackend `json:"bss-storage-backend,omitempty"`
+	Version        string          `json:"bss-version,omitempty"`
+	Status         string          `json:"bss-status,omitempty"`
+	HSMStatus      string          `json:"bss-status-hsm,omitempty"`
+	StorageBackend *storageBackend `json:"bss-storage-backend,omitempty"`
 }
 
 type storageBackend struct {
@@ -85,32 +85,34 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 	}
 	if strings.Contains(strings.ToUpper(req.URL.Path), "DATA") ||
 		strings.Contains(strings.ToUpper(req.URL.Path), "ALL") {
+		var sb storageBackend
+		bssStatus.StorageBackend = &sb
 		if useSQL {
-			bssStatus.StorageBackend.Name = "postgres"
-			bssStatus.StorageBackend.Status = "connected"
+			sb.Name = "postgres"
+			sb.Status = "connected"
 
 			if bp, err := bssdb.GetBootParamsAll(); err != nil {
 				httpStatus = http.StatusInternalServerError
 				log.Printf("Test access to postgres failed: %v", err)
-				bssStatus.StorageBackend.Status = "error"
+				sb.Status = "error"
 			} else {
 				log.Println("Test access to postgres using postgres.BootParamsGetAll() succeeded")
 				debugf("Boot parameters returned: %v", bp)
 			}
 		} else {
-			bssStatus.StorageBackend.Name = "etcd"
-			bssStatus.StorageBackend.Status = "connected"
+			sb.Name = "etcd"
+			sb.Status = "connected"
 			randnum := rand.Intn(255)
 			err := etcdTestStore(randnum)
 			if err != nil {
 				httpStatus = http.StatusInternalServerError
-				bssStatus.StorageBackend.Status = "error"
+				sb.Status = "error"
 				log.Printf("Test store to etcd failed: %s", err)
 			} else {
 				ret, err := etcdTestGet()
 				if err != nil || ret != randnum {
 					httpStatus = http.StatusInternalServerError
-					bssStatus.StorageBackend.Status = "error"
+					sb.Status = "error"
 					if err != nil {
 						log.Printf("Test read from etcd failed: %s", err)
 					} else {
@@ -186,34 +188,36 @@ func serviceDataResponse(w http.ResponseWriter, req *http.Request) {
 	var (
 		bssStatus  serviceStatus
 		httpStatus = http.StatusOK
+		sb         storageBackend
 	)
 
+	bssStatus.StorageBackend = &sb
 	if useSQL {
-		bssStatus.StorageBackend.Name = "postgres"
-		bssStatus.StorageBackend.Status = "connected"
+		sb.Name = "postgres"
+		sb.Status = "connected"
 
 		if bp, err := bssdb.GetBootParamsAll(); err != nil {
 			httpStatus = http.StatusInternalServerError
 			log.Printf("Test access to postgres failed: %v", err)
-			bssStatus.StorageBackend.Status = "error"
+			sb.Status = "error"
 		} else {
 			log.Println("Test access to postgres using BootParamsGetAll() succeeded")
 			debugf("Boot parameters returned: %v", bp)
 		}
 	} else {
-		bssStatus.StorageBackend.Name = "etcd"
-		bssStatus.StorageBackend.Status = "connected"
+		sb.Name = "etcd"
+		sb.Status = "connected"
 		randnum := rand.Intn(255)
 		err := etcdTestStore(randnum)
 		if err != nil {
 			httpStatus = http.StatusInternalServerError
-			bssStatus.StorageBackend.Status = "error"
+			sb.Status = "error"
 			log.Printf("Test store to etcd failed: %s", err)
 		} else {
 			ret, err := etcdTestGet()
 			if err != nil || ret != randnum {
 				httpStatus = http.StatusInternalServerError
-				bssStatus.StorageBackend.Status = "error"
+				sb.Status = "error"
 				if err != nil {
 					log.Printf("Test read from etcd failed: %s", err)
 				} else {
