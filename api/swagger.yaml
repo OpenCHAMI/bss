@@ -628,39 +628,59 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/Error'
-  /boot/v1/service/etcd:
+  /boot/v1/service/data:
     get:
-      summary: "Retrieve the current connection status to ETCD"
+      summary: "Retrieve the current connection status to storage backend"
       tags:
       - service-status
       - cli_ignore
       description: |
-        Retrieve the current connection status to the BSS ETCD database.
+        Retrieve the current connection status to the BSS backend storage database. This can
+        either be ETCD or PostgreSQL, depending on which storage backend BSS was started with.
         
-        The connection to ETCD will be tested by writing a value to ETCD, and then reading it
-        back from the database. If the value is successfully writen to ETCD and read back as the 
-        same value, then the connection to ETCD is considered to be connected. Otherwise, there
-        is a connection error.
+        If PostgreSQL is being used, the connection will be tested by attempting to retrieve all
+        of the boot parameters that BSS knows about. If this succeeds (even if the result is
+        empty), then the connection to PostgreSQL is considered to be connected. If this fails,
+        there is a connection error.
+
+        If ETCD is being used, the connection will be tested by writing a value to ETCD, and then
+        reading it back from the database. If the value is successfully writen to ETCD and read
+        back as the same value, then the connection to ETCD is considered to be connected.
+        Otherwise, there is a connection error.
         
       responses:
         '200':
-          description: 'The ETCD database connection is healthy.'
+          description: 'The connection to the storage backend is healthy.'
           schema:
             type: object
             properties:
-              bss-status-etcd:
-                type: string
-                enum: ["connected"]
-                description: Current connection status to ETCD.
+              bss-storage-backend:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    enum: ["etcd","postgres"]
+                    description: 'Name of the storage backend.'
+                  status:
+                    type: string
+                    enum: ["connected"]
+                    description: 'Current connection status to the storage backend.'
         '500':
-          description: 'The ETCD database connection is unhealthy.'
+          description: 'The connection to the storage backend is unhealthy.'
           schema:
             type: object
             properties:
-              bss-status-etcd:
-                type: string
-                enum: ["error"]
-                description: Current connection status to ETCD.
+              bss-storage-backend:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    enum: ["etcd","postgres"]
+                    description: 'Name of the storage backend.'
+                  status:
+                    type: string
+                    enum: ["error"]
+                    description: 'Current connection status to the storage backend.'
             
   /boot/v1/service/hsm:
     get:
@@ -743,10 +763,10 @@ paths:
               bss-status:
                 type: string
                 enum: ["running"]
-              bss-status-etcd:
+              bss-status-storage-backend:
                 type: string
                 enum: ["connected"]
-                description: Current connection status to ETCD.
+                description: Current connection status to storage backend.
               bss-status-hsm:
                 type: string
                 enum: ["connected"]
@@ -763,7 +783,7 @@ paths:
               bss-status:
                 type: string
                 enum: ["running"]
-              bss-status-etcd:
+              bss-status-storage-backend:
                 type: string
                 enum: ["connected", "error"]
                 description: Current connection status to ETCD.
