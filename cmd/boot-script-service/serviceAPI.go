@@ -83,7 +83,8 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 			rsp.Body.Close()
 		}
 	}
-	if strings.Contains(strings.ToUpper(req.URL.Path), "DATA") ||
+	if strings.Contains(strings.ToUpper(req.URL.Path), "STORAGE") &&
+		strings.Contains(strings.ToUpper(req.URL.Path), "STATUS") ||
 		strings.Contains(strings.ToUpper(req.URL.Path), "ALL") {
 		var sb storageBackend
 		bssStatus.StorageBackend = &sb
@@ -184,7 +185,7 @@ func serviceHSMResponse(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintln(w, string(out))
 }
 
-func serviceDataResponse(w http.ResponseWriter, req *http.Request) {
+func serviceStorageResponse(w http.ResponseWriter, req *http.Request) {
 	var (
 		bssStatus  serviceStatus
 		httpStatus = http.StatusOK
