@@ -763,10 +763,17 @@ paths:
               bss-status:
                 type: string
                 enum: ["running"]
-              bss-status-storage-backend:
-                type: string
-                enum: ["connected"]
-                description: Current connection status to storage backend.
+              bss-storage-backend:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    enum: ["etcd","postgres"]
+                    description: 'Name of the storage backend.'
+                  status:
+                    type: string
+                    enum: ["connected"]
+                    description: 'Current connection status to the storage backend.'
               bss-status-hsm:
                 type: string
                 enum: ["connected"]
@@ -783,11 +790,17 @@ paths:
               bss-status:
                 type: string
                 enum: ["running"]
-              bss-status-storage-backend:
-                type: string
-                enum: ["connected", "error"]
-                description: Current connection status to ETCD.
-                example: "error"
+              bss-storage-backend:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    enum: ["etcd","postgres"]
+                    description: 'Name of the storage backend.'
+                  status:
+                    type: string
+                    enum: ["error"]
+                    description: 'Current connection status to the storage backend.'
               bss-status-hsm:
                 type: string
                 enum: ["connected", "error"]
