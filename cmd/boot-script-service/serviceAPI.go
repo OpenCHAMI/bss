@@ -108,14 +108,14 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				httpStatus = http.StatusInternalServerError
 				sb.Status = "error"
-				log.Printf("Test store to etcd failed: %s", err)
+				log.Printf("Test store to etcd failed: %v", err)
 			} else {
 				ret, err := etcdTestGet()
 				if err != nil || ret != randnum {
 					httpStatus = http.StatusInternalServerError
 					sb.Status = "error"
 					if err != nil {
-						log.Printf("Test read from etcd failed: %s", err)
+						log.Printf("Test read from etcd failed: %v", err)
 					} else {
 						log.Printf("Test read from etcd miscompare: Expected %d, Actual %d", randnum, ret)
 					}
@@ -149,7 +149,7 @@ func serviceVersionResponse(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			httpStatus = http.StatusInternalServerError
 			dat = []byte("error")
-			log.Printf("Cannot read version file: %s", err)
+			log.Printf("Cannot read version file: %v", err)
 		}
 	}
 	bssStatus.Version = strings.TrimSpace(string(dat))
@@ -169,7 +169,7 @@ func serviceHSMResponse(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		httpStatus = http.StatusInternalServerError
 		bssStatus.HSMStatus = "error"
-		log.Printf("Cannot connect to HSM: %s", err)
+		log.Printf("Cannot connect to HSM: %v", err)
 	} else {
 		_, err = ioutil.ReadAll(rsp.Body)
 		if err != nil {
