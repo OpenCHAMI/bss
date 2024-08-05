@@ -97,7 +97,7 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 				log.Printf("Test access to postgres failed: %v", err)
 				sb.Status = "error"
 			} else {
-				log.Println("Test access to postgres using postgres.BootParamsGetAll() succeeded")
+				log.Println("Test access to postgres using postgres.GetBootParamsAll() succeeded")
 				debugf("Boot parameters returned: %v", bp)
 			}
 		} else {
