@@ -644,7 +644,7 @@ paths:
         there is a connection error.
 
         If ETCD is being used, the connection will be tested by writing a value to ETCD, and then
-        reading it back from the database. If the value is successfully writen to ETCD and read
+        reading it back from the database. If the value is successfully written to ETCD and read
         back as the same value, then the connection to ETCD is considered to be connected.
         Otherwise, there is a connection error.
         
