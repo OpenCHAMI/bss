@@ -91,10 +91,10 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 
 			if bp, err := bssdb.GetBootParamsAll(); err != nil {
 				httpStatus = http.StatusInternalServerError
-				log.Printf("Test access to postgres failed: BootParamsGetAll(): %v", err)
+				log.Printf("Test access to postgres failed: %v", err)
 				bssStatus.StorageBackend.Status = "error"
 			} else {
-				log.Println("Test access to postgres using BootParamsGetAll() succeeded")
+				log.Println("Test access to postgres using postgres.BootParamsGetAll() succeeded")
 				debugf("Boot parameters returned: %v", bp)
 			}
 		} else {
@@ -194,7 +194,7 @@ func serviceDataResponse(w http.ResponseWriter, req *http.Request) {
 
 		if bp, err := bssdb.GetBootParamsAll(); err != nil {
 			httpStatus = http.StatusInternalServerError
-			log.Printf("Test access to postgres failed: BootParamsGetAll(): %v", err)
+			log.Printf("Test access to postgres failed: %v", err)
 			bssStatus.StorageBackend.Status = "error"
 		} else {
 			log.Println("Test access to postgres using BootParamsGetAll() succeeded")
