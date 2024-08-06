@@ -33,10 +33,15 @@ import (
 )
 
 type serviceStatus struct {
-	Version    string `json:"bss-version,omitempty"`
-	Status     string `json:"bss-status,omitempty"`
-	HSMStatus  string `json:"bss-status-hsm,omitempty"`
-	EctdStatus string `json:"bss-status-etcd,omitempty"`
+	Version        string          `json:"bss-version,omitempty"`
+	Status         string          `json:"bss-status,omitempty"`
+	HSMStatus      string          `json:"bss-status-hsm,omitempty"`
+	StorageBackend *storageBackend `json:"bss-storage-backend,omitempty"`
+}
+
+type storageBackend struct {
+	Name   string `json:"name",omitempty`
+	Status string `json:"status",omitempty`
 }
 
 func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
@@ -78,24 +83,42 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 			rsp.Body.Close()
 		}
 	}
-	if strings.Contains(strings.ToUpper(req.URL.Path), "ETCD") ||
+	if strings.Contains(strings.ToUpper(req.URL.Path), "STORAGE") &&
+		strings.Contains(strings.ToUpper(req.URL.Path), "STATUS") ||
 		strings.Contains(strings.ToUpper(req.URL.Path), "ALL") {
-		bssStatus.EctdStatus = "connected"
-		randnum := rand.Intn(255)
-		err := etcdTestStore(randnum)
-		if err != nil {
-			httpStatus = http.StatusInternalServerError
-			bssStatus.EctdStatus = "error"
-			log.Printf("Test store to etcd failed: %s", err)
-		} else {
-			ret, err := etcdTestGet()
-			if err != nil || ret != randnum {
+		var sb storageBackend
+		bssStatus.StorageBackend = &sb
+		if useSQL {
+			sb.Name = "postgres"
+			sb.Status = "connected"
+
+			if bp, err := bssdb.GetBootParamsAll(); err != nil {
 				httpStatus = http.StatusInternalServerError
-				bssStatus.EctdStatus = "error"
-				if err != nil {
-					log.Printf("Test read from etcd failed: %s", err)
-				} else {
-					log.Printf("Test read from etcd miscompare: Expected %d, Actual %d", randnum, ret)
+				log.Printf("Test access to postgres failed: %v", err)
+				sb.Status = "error"
+			} else {
+				log.Println("Test access to postgres using postgres.GetBootParamsAll() succeeded")
+				debugf("Boot parameters returned: %v", bp)
+			}
+		} else {
+			sb.Name = "etcd"
+			sb.Status = "connected"
+			randnum := rand.Intn(255)
+			err := etcdTestStore(randnum)
+			if err != nil {
+				httpStatus = http.StatusInternalServerError
+				sb.Status = "error"
+				log.Printf("Test store to etcd failed: %v", err)
+			} else {
+				ret, err := etcdTestGet()
+				if err != nil || ret != randnum {
+					httpStatus = http.StatusInternalServerError
+					sb.Status = "error"
+					if err != nil {
+						log.Printf("Test read from etcd failed: %v", err)
+					} else {
+						log.Printf("Test read from etcd miscompare: Expected %d, Actual %d", randnum, ret)
+					}
 				}
 			}
 		}
@@ -126,7 +149,7 @@ func serviceVersionResponse(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			httpStatus = http.StatusInternalServerError
 			dat = []byte("error")
-			log.Printf("Cannot read version file: %s", err)
+			log.Printf("Cannot read version file: %v", err)
 		}
 	}
 	bssStatus.Version = strings.TrimSpace(string(dat))
@@ -146,7 +169,7 @@ func serviceHSMResponse(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		httpStatus = http.StatusInternalServerError
 		bssStatus.HSMStatus = "error"
-		log.Printf("Cannot connect to HSM: %s", err)
+		log.Printf("Cannot connect to HSM: %v", err)
 	} else {
 		_, err = ioutil.ReadAll(rsp.Body)
 		if err != nil {
@@ -162,26 +185,45 @@ func serviceHSMResponse(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintln(w, string(out))
 }
 
-func serviceETCDResponse(w http.ResponseWriter, req *http.Request) {
-	var bssStatus serviceStatus
-	var httpStatus = http.StatusOK
+func serviceStorageResponse(w http.ResponseWriter, req *http.Request) {
+	var (
+		bssStatus  serviceStatus
+		httpStatus = http.StatusOK
+		sb         storageBackend
+	)
 
-	bssStatus.EctdStatus = "connected"
-	randnum := rand.Intn(255)
-	err := etcdTestStore(randnum)
-	if err != nil {
-		httpStatus = http.StatusInternalServerError
-		bssStatus.EctdStatus = "error"
-		log.Printf("Test store to etcd failed: %s", err)
-	} else {
-		ret, err := etcdTestGet()
-		if err != nil || ret != randnum {
+	bssStatus.StorageBackend = &sb
+	if useSQL {
+		sb.Name = "postgres"
+		sb.Status = "connected"
+
+		if bp, err := bssdb.GetBootParamsAll(); err != nil {
 			httpStatus = http.StatusInternalServerError
-			bssStatus.EctdStatus = "error"
-			if err != nil {
-				log.Printf("Test read from etcd failed: %s", err)
-			} else {
-				log.Printf("Test read from etcd miscompare: Expected %d, Actual %d", randnum, ret)
+			log.Printf("Test access to postgres failed: %v", err)
+			sb.Status = "error"
+		} else {
+			log.Println("Test access to postgres using BootParamsGetAll() succeeded")
+			debugf("Boot parameters returned: %v", bp)
+		}
+	} else {
+		sb.Name = "etcd"
+		sb.Status = "connected"
+		randnum := rand.Intn(255)
+		err := etcdTestStore(randnum)
+		if err != nil {
+			httpStatus = http.StatusInternalServerError
+			sb.Status = "error"
+			log.Printf("Test store to etcd failed: %s", err)
+		} else {
+			ret, err := etcdTestGet()
+			if err != nil || ret != randnum {
+				httpStatus = http.StatusInternalServerError
+				sb.Status = "error"
+				if err != nil {
+					log.Printf("Test read from etcd failed: %s", err)
+				} else {
+					log.Printf("Test read from etcd miscompare: Expected %d, Actual %d", randnum, ret)
+				}
 			}
 		}
 	}

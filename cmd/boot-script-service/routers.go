@@ -91,10 +91,11 @@ func initHandlers() *chi.Mux {
 	router.HandleFunc(baseEndpoint+"/bootscript", bootScript)
 	router.HandleFunc(baseEndpoint+"/hosts", hosts)
 	router.HandleFunc(baseEndpoint+"/dumpstate", dumpstate)
+	router.HandleFunc(baseEndpoint+"/service/all", service)
 	router.HandleFunc(baseEndpoint+"/service/status", serviceStatusResponse)
 	router.HandleFunc(baseEndpoint+"/service/version", serviceVersionResponse)
 	router.HandleFunc(baseEndpoint+"/service/hsm", serviceHSMResponse)
-	router.HandleFunc(baseEndpoint+"/service/etcd", serviceETCDResponse)
+	router.HandleFunc(baseEndpoint+"/service/storage/status", serviceStorageResponse)
 	// cloud-init
 	router.HandleFunc(metaDataRoute, metaDataGet)
 	router.HandleFunc(userDataRoute, userDataGet)
