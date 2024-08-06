@@ -12,3 +12,9 @@
 // so.
 
 package postgres
+
+type EndpointAccess struct {
+	Name      string `json:"name"`
+	Endpoint  string `json:"endpoint"`
+	LastEpoch int64  `json:"last_epoch"`
+}
