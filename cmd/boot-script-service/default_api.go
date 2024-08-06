@@ -899,9 +899,7 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 				log.Printf("BSS request succeeded for %s", descr)
 
 				// Record the fact this was asked for.
-				if !useSQL {
-					updateEndpointAccessed(comp.ID, bssTypes.EndpointTypeBootscript)
-				}
+				updateEndpointAccessed(comp.ID, bssTypes.EndpointTypeBootscript)
 			}
 		} else {
 			log.Printf("BSS request failed writing response for %s: %s", descr, err.Error())
