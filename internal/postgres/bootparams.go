@@ -16,12 +16,12 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 	"github.com/docker/distribution/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/Cray-HPE/hms-xname/xnames"
 	_ "github.com/lib/pq"
 )
 
@@ -1412,7 +1412,6 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 	var (
 		groupNames []string
 		xNames     []string
-		reXName    = regexp.MustCompile(xNameRegex)
 		nodesToAdd []Node
 	)
 
@@ -1432,8 +1431,10 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 	case len(bp.Hosts) > 0:
 		// Check each host to see if it is an XName or a node group name.
 		for _, name := range bp.Hosts {
-			match := reXName.FindString(name)
-			if match == "" {
+			xnameRaw := xnames.FromString(name)
+			if xnameRaw == nil {
+				groupNames = append(groupNames, name)
+			} else if _, ok := xnameRaw.(xnames.Node); !ok {
 				groupNames = append(groupNames, name)
 			} else {
 				xNames = append(xNames, name)
@@ -1541,12 +1542,13 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 		var (
 			groupNames []string
 			xNames     []string
-			reXName    = regexp.MustCompile(xNameRegex)
 		)
 		// Check each host to see if it is an XName or a node group name.
 		for _, name := range bp.Hosts {
-			match := reXName.FindString(name)
-			if match == "" {
+			xnameRaw := xnames.FromString(name)
+			if xnameRaw == nil {
+				groupNames = append(groupNames, name)
+			} else if _, ok := xnameRaw.(xnames.Node); !ok {
 				groupNames = append(groupNames, name)
 			} else {
 				xNames = append(xNames, name)

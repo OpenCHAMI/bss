@@ -22,10 +22,6 @@ import (
 	"github.com/jmoiron/sqlx/reflectx"
 )
 
-const (
-	xNameRegex = `^x([0-9]{1,4})c([0-7])(s([0-9]{1,4}))?b([0])(n([0-9]{1,4}))?$`
-)
-
 // makeKey creates a key from a key and subkey.  If key is not empty, it will
 // be prepended with a '/' if it does not already start with one.  If subkey is
 // not empty, it will be appended with a '/' if it does not already end with
