@@ -800,11 +800,19 @@ func updateCloudInit(d *bssTypes.CloudInit, p bssTypes.CloudInit) bool {
 }
 
 func updateEndpointAccessed(name string, accessType bssTypes.EndpointType) {
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	key := fmt.Sprintf("%s/%s/%s", endpointAccessPfx, name, accessType)
-	if err := kvstore.Store(key, timestamp); err != nil {
-		log.Printf("Failed to store last access timestamp %s to key %s: %s",
-			timestamp, key, err)
+	if useSQL {
+		err := bssdb.LogEndpointAccess(name, accessType)
+		if err != nil {
+			log.Printf("Failed to store last access timestamp for endpoint=%q name=%q to postgres DB: %s",
+				accessType, name, err)
+		}
+	} else {
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+		key := fmt.Sprintf("%s/%s/%s", endpointAccessPfx, name, accessType)
+		if err := kvstore.Store(key, timestamp); err != nil {
+			log.Printf("Failed to store last access timestamp %s to key %s: %s",
+				timestamp, key, err)
+		}
 	}
 }
 
