@@ -40,6 +40,7 @@ import (
 	"log"
 	"net/http"
 	net_url "net/url"
+	"os"
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
@@ -47,6 +48,10 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/hashicorp/go-retryablehttp"
+	openchami_authenticator "github.com/openchami/chi-middleware/auth"
+	openchami_logger "github.com/openchami/chi-middleware/log"
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 )
 
 const (
@@ -63,18 +68,23 @@ var (
 )
 
 func initHandlers() *chi.Mux {
+	// Setup logger
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	logger := zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)
+	router.Use(openchami_logger.OpenCHAMILogger(logger))
 	router.Use(middleware.Timeout(60 * time.Second))
 	if jwksURL != "" {
 		router.Group(func(r chi.Router) {
 			r.Use(
 				jwtauth.Verifier(tokenAuth),
-				jwtauth.Authenticator(tokenAuth),
+				openchami_authenticator.AuthenticatorWithRequiredClaims(tokenAuth, []string{"sub", "iss", "aud"}),
 			)
 
 			// protected routes if using auth
