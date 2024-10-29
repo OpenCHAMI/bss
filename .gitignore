@@ -2,11 +2,6 @@ kubernetes/.packaged/
 .idea/
 *.swp
 
-
-# Binaries
-boot-script-service
-bss-init
-
 # Prevent certificates from getting checked in
 *.ca
 *.cer

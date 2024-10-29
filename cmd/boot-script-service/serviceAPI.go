@@ -25,6 +25,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -53,16 +54,8 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 	}
 	if strings.Contains(strings.ToUpper(req.URL.Path), "VERSION") ||
 		strings.Contains(strings.ToUpper(req.URL.Path), "ALL") {
-		dat, err := ioutil.ReadFile(".version")
-		if err != nil {
-			dat, err = ioutil.ReadFile("../../.version")
-			if err != nil {
-				httpStatus = http.StatusInternalServerError
-				dat = []byte("error")
-				log.Printf("Cannot read version file: %s", err)
-			}
-		}
-		bssStatus.Version = strings.TrimSpace(string(dat))
+
+		bssStatus.Version = strings.TrimSpace(Version)
 	}
 	if strings.Contains(strings.ToUpper(req.URL.Path), "HSM") ||
 		strings.Contains(strings.ToUpper(req.URL.Path), "ALL") {
@@ -74,7 +67,7 @@ func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
 			bssStatus.HSMStatus = "error"
 			log.Printf("Cannot connect to HSM: %s", err)
 		} else {
-			_, err = ioutil.ReadAll(rsp.Body)
+			_, err = io.ReadAll(rsp.Body)
 			if err != nil {
 				httpStatus = http.StatusInternalServerError
 				bssStatus.HSMStatus = "error"
