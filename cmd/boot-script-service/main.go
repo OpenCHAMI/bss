@@ -441,6 +441,7 @@ func parseCmdLine() {
 }
 
 func main() {
+	PrintVersionInfo()
 	err := parseEnvVars()
 	if err != nil {
 		log.Println(err)
