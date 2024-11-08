@@ -1,4 +1,4 @@
-version: 2
+version: 2.4
 
 project_name: bss
 before:
@@ -17,7 +17,7 @@ builds:
       - amd64
       - arm64
     goamd64:
-      - v3
+      - v4
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -41,7 +41,7 @@ builds:
       - amd64
       - arm64
     goamd64:
-      - v3
+      - v4
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -69,7 +69,7 @@ dockers:
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
     goarch: amd64
-    goamd64: v3
+    goamd64: v4
     extra_files:
       - LICENSE
       - CHANGELOG.md
@@ -146,9 +146,9 @@ nfpms:
           section: utils
           priority: optional
           contents:
-            - src: dist/bss_{{ .Os }}_{{ if eq .Arch "amd64" }}{{ .Arch }}_{{ .Amd64 }}{{ else }}{{ .Arch }}{{ end }}/boot-script-service
+            - src: dist/bss_{{ .Os }}_{{ if eq .Arch "amd64" }}{{ .Arch }}_{{ .Amd64 }}{{ else if eq .Arch "arm64" }}{{ .Arch }}_{{ .Arm64 }}{{ else }}{{ .Arch }}{{ end }}/boot-script-service
               dst: /usr/local/bin/bss
-            - src: dist/bss-init_{{ .Os }}_{{ if eq .Arch "amd64" }}{{ .Arch }}_{{ .Amd64 }}{{ else }}{{ .Arch }}{{ end }}/bss-init
+            - src: dist/bss-init_{{ .Os }}_{{ if eq .Arch "amd64" }}{{ .Arch }}_{{ .Amd64 }}{{ else if eq .Arch "arm64" }}{{ .Arch }}_{{ .Arm64 }}{{ else }}{{ .Arch }}{{ end }}/bss-init
               dst: /usr/local/bin/bss-init
 
 

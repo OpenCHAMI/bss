@@ -36,7 +36,7 @@
               echo "BUILD_HOST=$(hostname)" >> $GITHUB_ENV
               echo "GO_VERSION=$(go version | awk '{print $3}')" >> $GITHUB_ENV
               echo "BUILD_USER=$(whoami)" >> $GITHUB_ENV
-              echo "CGO_ENABLED=1" >> $GITHUB_ENV
+
 
           - name: Build with goreleaser
             uses: goreleaser/goreleaser-action@v6

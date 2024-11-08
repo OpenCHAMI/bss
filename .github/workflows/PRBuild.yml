@@ -1,0 +1,49 @@
+name: Build PR with goreleaser
+
+on:
+    pull_request:
+        branches:
+            - main
+        types: [opened, synchronize, reopened, edited]
+    workflow_dispatch:
+    
+
+jobs:
+  prbuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install cross-compilation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Set up latest stable Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: 1
+          fetch-depth: 1
+
+      # Set environment variables required by GoReleaser
+      - name: Set build environment variables
+        run: |
+          echo "GIT_STATE=$(if git diff-index --quiet HEAD --; then echo 'clean'; else echo 'dirty'; fi)" >> $GITHUB_ENV
+          echo "BUILD_HOST=$(hostname)" >> $GITHUB_ENV
+          echo "GO_VERSION=$(go version | awk '{print $3}')" >> $GITHUB_ENV
+          echo "BUILD_USER=$(whoami)" >> $GITHUB_ENV
+          
+
+      - name: Build with goreleaser
+        uses: goreleaser/goreleaser-action@v6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          version: '~> v2'
+          args: build --clean --snapshot
+        id: goreleaser
