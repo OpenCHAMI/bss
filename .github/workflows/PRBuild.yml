@@ -1,4 +1,4 @@
-name: Build PR with goreleaser
+name: Run Unit Tests and Build PR with goreleaser
 
 on:
     pull_request:
@@ -29,6 +29,14 @@ jobs:
         with:
           fetch-tags: 1
           fetch-depth: 1
+
+      - name: Install dependencies
+        run: go get ./boot-script-service ./bss-init
+        working-directory: ./cmd
+
+      - name: Test with the Go CLI
+        run: go test ./boot-script-service ./bss-init
+        working-directory: ./cmd
 
       # Set environment variables required by GoReleaser
       - name: Set build environment variables
