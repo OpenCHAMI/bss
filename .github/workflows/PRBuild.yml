@@ -3,7 +3,7 @@ name: Run Unit Tests and Build PR with goreleaser
 on:
     pull_request:
         branches:
-            - main
+            - '**'
         types: [opened, synchronize, reopened, edited]
     workflow_dispatch:
     
