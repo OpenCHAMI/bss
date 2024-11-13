@@ -48,7 +48,6 @@ import (
 	"strings"
 	"time"
 
-	base "github.com/Cray-HPE/hms-base"
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
 	"github.com/OpenCHAMI/bss/internal/postgres"
 )
@@ -441,6 +440,7 @@ func parseCmdLine() {
 }
 
 func main() {
+	PrintVersionInfo()
 	err := parseEnvVars()
 	if err != nil {
 		log.Println(err)
@@ -448,7 +448,7 @@ func main() {
 	}
 	parseCmdLine()
 
-	sn, snerr := base.GetServiceInstanceName()
+	sn, snerr := os.Hostname()
 	if snerr == nil {
 		serviceName = sn
 	}

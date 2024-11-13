@@ -1,5 +1,4 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
+version: 2.4
 
 project_name: bss
 before:
@@ -13,41 +12,109 @@ builds:
     binary: boot-script-service
     goos:
       - linux
+      - darwin
     goarch:
       - amd64
-    no_unique_dist_dir: true
-    tags:
-      - dynamic
+      - arm64
+    goamd64:
+      - v3
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - "-s -w -X main.GitCommit={{.Commit}} \
+         -X main.BuildTime={{.Timestamp}} \
+         -X main.Version={{.Version}} \
+         -X main.GitBranch={{.Branch}} \
+         -X main.GitTag={{.Tag}} \
+         -X main.GitState={{ .Env.GIT_STATE }} \
+         -X main.BuildHost={{ .Env.BUILD_HOST }} \
+         -X main.GoVersion={{ .Env.GO_VERSION }} \
+         -X main.BuildUser={{ .Env.BUILD_USER }} "
+
   - id: bss-init
     main: ./cmd/bss-init
     binary: bss-init
     goos:
       - linux
+      - darwin
     goarch:
       - amd64
-    no_unique_dist_dir: true
-    tags:
-      - dynamic
+      - arm64
+    goamd64:
+      - v3
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - "-s -w -X main.GitCommit={{.Commit}} \
+         -X main.BuildTime={{.Timestamp}} \
+         -X main.Version={{.Version}} \
+         -X main.GitBranch={{.Branch}} \
+         -X main.GitTag={{.Tag}} \
+         -X main.GitState={{ .Env.GIT_STATE }} \
+         -X main.BuildHost={{ .Env.BUILD_HOST }} \
+         -X main.GoVersion={{ .Env.GO_VERSION }} \
+         -X main.BuildUser={{ .Env.BUILD_USER }} "
 
 dockers:
-  - 
-    image_templates:
-      - ghcr.io/openchami/{{.ProjectName}}:latest
-      - ghcr.io/openchami/{{.ProjectName}}:{{ .Tag }}
-      - ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}
-      - ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}.{{ .Minor }}
+  - image_templates:
+      - &amd64_linux_image ghcr.io/openchami/{{.ProjectName}}:{{ .Tag }}-amd64
+      - ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}-amd64
+      - ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}.{{ .Minor }}-amd64
+    use: buildx
     build_flag_templates:
       - "--pull"
+      - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
+    goarch: amd64
+    goamd64: v3
     extra_files:
       - LICENSE
       - CHANGELOG.md
       - README.md
-      - .version
       - migrations/
+
+  - image_templates:
+      - &arm64v8_linux_image ghcr.io/openchami/{{.ProjectName}}:{{ .Tag }}-arm64
+      - ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}-arm64
+      - ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}.{{ .Minor }}-arm64
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    goarch: arm64
+    extra_files:
+      - LICENSE
+      - CHANGELOG.md
+      - README.md
+      - migrations/
+
+docker_manifests:
+  - name_template: "ghcr.io/openchami/{{.ProjectName}}:latest"
+    image_templates:
+      - *amd64_linux_image
+      - *arm64v8_linux_image
+
+  - name_template: "ghcr.io/openchami/{{.ProjectName}}:{{ .Tag }}"
+    image_templates:
+      - *amd64_linux_image
+      - *arm64v8_linux_image
+
+  - name_template: "ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}"
+    image_templates:
+      - *amd64_linux_image
+      - *arm64v8_linux_image
+
+  - name_template: "ghcr.io/openchami/{{.ProjectName}}:{{ .Major }}.{{ .Minor }}"
+    image_templates:
+      - *amd64_linux_image
+      - *arm64v8_linux_image
 
 archives:
   - format: tar.gz
@@ -65,10 +132,30 @@ archives:
       - README.md
 
 
+
+nfpms:
+        - id: bss
+          formats: 
+          - deb
+          - rpm
+          - apk
+          maintainer: "Alex Lovell-Troy <alovelltroy@lanl.gov>"
+          description: "BSS is a tool for managing the bootscripts of an HPC system.  Read more at https://www.openchami.org"
+          homepage: "https://www.openchami.org"
+          license: MIT
+          section: utils
+          priority: optional
+          contents:
+            - src: dist/bss_{{ .Os }}_{{ if eq .Arch "amd64" }}{{ .Arch }}_{{ .Amd64 }}{{ else if eq .Arch "arm64" }}{{ .Arch }}_{{ .Arm64 }}{{ else }}{{ .Arch }}{{ end }}/boot-script-service
+              dst: /usr/local/bin/bss
+            - src: dist/bss-init_{{ .Os }}_{{ if eq .Arch "amd64" }}{{ .Arch }}_{{ .Amd64 }}{{ else if eq .Arch "arm64" }}{{ .Arch }}_{{ .Arm64 }}{{ else }}{{ .Arch }}{{ end }}/bss-init
+              dst: /usr/local/bin/bss-init
+
+
 checksum:
   name_template: 'checksums.txt'
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:

@@ -144,7 +144,6 @@ RUN set -ex \
 COPY boot-script-service /usr/local/bin/
 COPY bss-init /usr/local/bin/
 COPY migrations/* /migrations/
-COPY .version /
 
 # nobody 65534:65534
 USER 65534:65534
