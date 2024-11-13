@@ -66,7 +66,7 @@ jobs:
       - name: Attest boot-script-service binary amd64
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: dist/bss_linux_amd64_v4/boot-script-service
+          subject-path: dist/bss_linux_amd64_v3/boot-script-service
       - name: Attest boot-script-service binary arm64
         uses: actions/attest-build-provenance@v1
         with:
@@ -74,7 +74,7 @@ jobs:
       - name: Attest bss-init binary amd64
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: dist/bss-init_linux_amd64_v4/bss-init
+          subject-path: dist/bss-init_linux_amd64_v3/bss-init
       - name: Attest bss-init binary arm64
         uses: actions/attest-build-provenance@v1
         with:
