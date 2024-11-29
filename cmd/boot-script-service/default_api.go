@@ -450,6 +450,16 @@ func BootparametersPost(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("Bad Request: %s", err))
 		return
 	}
+	// Check that the xnames are valid
+	err = args.CheckXnames()
+	if err != nil {
+		// Invalid xname format (if included), invalid request
+		LogBootParameters(fmt.Sprintf("/bootparameters POST FAILED: %s", err.Error()), args)
+		base.SendProblemDetailsGeneric(w, http.StatusBadRequest,
+			fmt.Sprintf("Bad Request: %s", err))
+		return
+	}
+	// Fields appear to be correct.  Continue with processing.
 	debugf("Received boot parameters: %v\n", args)
 	err, referralToken := StoreNew(args)
 	if err == nil {

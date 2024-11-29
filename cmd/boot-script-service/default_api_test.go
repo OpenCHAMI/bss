@@ -23,9 +23,15 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"testing"
+
+	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 )
 
 func mockGetSignedS3Url(s3Url string) (string, error) {
@@ -177,5 +183,131 @@ func TestReplaceS3Params_error(t *testing.T) {
 	}
 	if newParams != expected_params {
 		t.Errorf("replaceS3Params failed.\n  expected: %s\n  actual: %s\n", expected_params, newParams)
+	}
+}
+
+func TestBootparametersPost_Success(t *testing.T) {
+
+	args := bssTypes.BootParams{
+		Macs:   []string{"00:11:22:33:44:55"},
+		Hosts:  []string{"x1c1s1b1n1"},
+		Nids:   []int32{1},
+		Kernel: "kernel",
+		Initrd: "initrd",
+		Params: "params",
+	}
+
+	body, _ := json.Marshal(args)
+	req, err := http.NewRequest("POST", "/bootparameters", bytes.NewBuffer(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(BootparametersPost)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusCreated {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusCreated)
+	}
+
+}
+
+func TestBootparametersPost_BadRequest(t *testing.T) {
+
+	req, err := http.NewRequest("POST", "/bootparameters", bytes.NewBuffer([]byte("invalid body")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(BootparametersPost)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+}
+
+func TestBootparametersPost_InvalidMac(t *testing.T) {
+
+	args := bssTypes.BootParams{
+		Macs:   []string{"invalid-mac"},
+		Hosts:  []string{"x1c1s1b1n1"},
+		Nids:   []int32{1},
+		Kernel: "kernel",
+		Initrd: "initrd",
+		Params: "params",
+	}
+
+	body, _ := json.Marshal(args)
+	req, err := http.NewRequest("POST", "/bootparameters", bytes.NewBuffer(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(BootparametersPost)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+}
+
+func TestBootparametersPost_InvalidXname(t *testing.T) {
+
+	args := bssTypes.BootParams{
+		Macs:   []string{"00:11:22:33:44:55"},
+		Hosts:  []string{"invalid-xname"},
+		Nids:   []int32{1},
+		Kernel: "kernel",
+		Initrd: "initrd",
+		Params: "params",
+	}
+
+	body, _ := json.Marshal(args)
+	req, err := http.NewRequest("POST", "/bootparameters", bytes.NewBuffer(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(BootparametersPost)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+}
+
+func TestBootparametersPost_StoreError(t *testing.T) {
+
+	args := bssTypes.BootParams{
+		Macs:   []string{"00:11:22:33:44:55"},
+		Hosts:  []string{"xname1"},
+		Nids:   []int32{1},
+		Kernel: "kernel",
+		Initrd: "initrd",
+		Params: "params",
+	}
+
+	body, _ := json.Marshal(args)
+	req, err := http.NewRequest("POST", "/bootparameters", bytes.NewBuffer(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(BootparametersPost)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
 	}
 }
