@@ -25,6 +25,8 @@ package bssTypes
 import (
 	"fmt"
 	"regexp"
+
+	"github.com/Cray-HPE/hms-xname/xnames"
 )
 
 type PhoneHome struct {
@@ -56,7 +58,7 @@ type CloudInit struct {
 // provide a "default" selection which provides a way to supply default
 // parameters for any node which is not explicitly configured.
 type BootParams struct {
-	Hosts     []string  `json:"hosts,omitempty"`
+	Hosts     []string  `json:"hosts,omitempty"` // This list of hosts must be xnames
 	Macs      []string  `json:"macs,omitempty"`
 	Nids      []int32   `json:"nids,omitempty"`
 	Params    string    `json:"params,omitempty"`
@@ -65,6 +67,7 @@ type BootParams struct {
 	CloudInit CloudInit `json:"cloud-init,omitempty"`
 }
 
+// Validate the MACs in the boot parameters
 func (bp BootParams) CheckMacs() (err error) {
 	if len(bp.Macs) > 0 {
 		re := regexp.MustCompile(`^([0-9A-Fa-f]{2}:){5}[0-9a-fA-F]{2}$`)
@@ -78,6 +81,20 @@ func (bp BootParams) CheckMacs() (err error) {
 
 	// All MACs are correctly format, return nil error
 	return
+}
+
+// Validate the xnames in the boot parameters.  They must be of type "Node"
+func (bp BootParams) CheckXnames() (err error) {
+	for _, xname := range bp.Hosts {
+		myXname := xnames.FromString(xname)
+		if myXname == nil {
+			return fmt.Errorf("invalid xname: %s", xname)
+		}
+		if myXname.Type() != "Node" {
+			return fmt.Errorf("invalid xname type: %s", myXname.Type())
+		}
+	}
+	return nil
 }
 
 // The following structures and types all related to the last access information for bootscripts and cloud-init data.
