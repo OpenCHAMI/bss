@@ -2,12 +2,10 @@ module github.com/OpenCHAMI/bss
 
 go 1.23
 
-replace github.com/Cray-HPE/hms-hmetcd => github.com/OpenCHAMI/hms-hmetcd v1.10.4
-
 require (
 	github.com/Cray-HPE/hms-base v1.15.1
-	github.com/Cray-HPE/hms-hmetcd v1.10.4
-	github.com/Cray-HPE/hms-s3 v1.10.1
+	github.com/Cray-HPE/hms-hmetcd v1.11.0
+	github.com/Cray-HPE/hms-s3 v1.11.0
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/evanphx/json-patch v5.9.0+incompatible
 	github.com/google/uuid v1.6.0
@@ -17,7 +15,7 @@ require (
 )
 
 require (
-	github.com/Cray-HPE/hms-xname v1.3.0
+	github.com/Cray-HPE/hms-xname v1.4.0
 	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
 	github.com/OpenCHAMI/smd/v2 v2.17.7
 	github.com/go-chi/chi v1.5.5
@@ -31,8 +29,8 @@ require (
 )
 
 require (
-	github.com/Cray-HPE/hms-certs v1.4.0 // indirect
-	github.com/Cray-HPE/hms-securestorage v1.13.0 // indirect
+	github.com/Cray-HPE/hms-certs v1.5.0 // indirect
+	github.com/Cray-HPE/hms-securestorage v1.14.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.5 // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
