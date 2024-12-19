@@ -506,7 +506,7 @@ func BootparametersPut(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 	} else {
-		LogBootParameters(fmt.Sprintf("/bootparameters PATCH FAILED: %s", err.Error()), args)
+		LogBootParameters(fmt.Sprintf("/bootparameters PUT FAILED: %s", err.Error()), args)
 		herr, ok := base.GetHMSError(err)
 		if ok && herr.GetProblem() != nil {
 			base.SendProblemDetails(w, herr.GetProblem(), 0)
