@@ -37,7 +37,7 @@ all: binaries
 .PHONY: binaries
 binaries: version $(BINARIES)
 
-.PHONY: docker
+.PHONY: container
 container: version $(BINARIES)
 	$(DOCKER) build --tag openchami/bss:$(VERSION)-dirty $(DOCKEROPTS) .
 
