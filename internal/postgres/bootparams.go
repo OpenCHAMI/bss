@@ -1685,7 +1685,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 
 	// Query for boot configs/groups that have a similar config to that passed.
 	//
-	// This is to make sure a duplicate boot config/group is added. When the boot configs/groups
+	// This is to make sure a duplicate boot config/group is not added. When the boot configs/groups
 	// are created for the nodes later (since the passed config is only partial), we compare
 	// them to configs in this map and do not add it to the database if it already exists.
 	var (
@@ -1708,7 +1708,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	// Determine boot configs/groups that need to be created, deleted, or left alone.
 	//
 	// Here, we have bgbcToN, which stores the boot configs/groups that correspond with nodes
-	// that were specified mapped to _all_ of the nodes that each boot confnig/group corresponds
+	// that were specified mapped to _all_ of the nodes that each boot config/group corresponds
 	// with. We also have nToBgbc, which stores each node that was specified mapped to the boot
 	// config/group it corresponds with. We compare data between the two to determine which boot
 	// configs/groups we can delete (no more nodes depend on it) and which we cannot (other
