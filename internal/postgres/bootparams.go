@@ -1881,6 +1881,82 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	return nodesUpdated, err
 }
 
+// Set modifies existing boot parameters, kernel, or initramfs URIs and adds any
+// new ones. Unlike Update, any nodes that do not already exist are added. Under
+// the hood, Set determines which nodes do not exist and calls Add to add them
+// with the new boot configuration, then determines which nodes do exist and
+// calls Update to update them with the new boot configuration.
+func (bddb BootDataDatabase) Set(bp bssTypes.BootParams) (err error) {
+	// Make sure the new content isn't blank.
+	lenParams := len(bp.Params)
+	lenKernUri := len(bp.Kernel)
+	lenInitrdUri := len(bp.Initrd)
+	if lenParams == 0 && lenKernUri == 0 && lenInitrdUri == 0 {
+		err = ErrPostgresUpdate{Err: fmt.Errorf("must specify at least one of params, kernel, or initrd")}
+		return err
+	}
+
+	// Create BootParams struct for _new_ nodes that will be added
+	addBp := bssTypes.BootParams{
+		Kernel: bp.Kernel,
+		Initrd: bp.Initrd,
+		Params: bp.Params,
+	}
+	_, addBp.Macs, addBp.Hosts, addBp.Nids, err = bddb.CheckNodeExistence(bp.Macs, bp.Hosts, bp.Nids)
+	if err != nil {
+		err = ErrPostgresUpdate{Err: err}
+		return err
+	}
+
+	// Create BootParams struct for _existing_ nodes that will be updated
+	updateBp := bssTypes.BootParams{
+		Kernel: bp.Kernel,
+		Initrd: bp.Initrd,
+		Params: bp.Params,
+	}
+	existingNodeList, err := bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
+	if err != nil {
+		err = ErrPostgresAdd{Err: err}
+		return err
+	}
+	for _, node := range existingNodeList {
+		if node.BootMac != "" {
+			updateBp.Macs = append(updateBp.Macs, node.BootMac)
+		}
+		if node.Xname != "" {
+			updateBp.Hosts = append(updateBp.Hosts, node.Xname)
+		}
+		if node.Nid != 0 {
+			updateBp.Nids = append(updateBp.Nids, node.Nid)
+		}
+	}
+
+	// Add new nodes, boot config, boot group, and boot group assignments.
+	//
+	// The Add() function will take care of boot config/group deduplication.
+	if len(addBp.Macs) > 0 || len(addBp.Hosts) > 0 || len(addBp.Nids) > 0 {
+		_, err = bddb.Add(addBp)
+		if err != nil {
+			err = ErrPostgresSet{Err: fmt.Errorf("failed to add new boot configuration: %w", err)}
+			return err
+		}
+	}
+
+	// Update existing nodes, boot config, boot group, and boot group
+	// assignments.
+	//
+	// The Update() function will take care of the deletion of dangling
+	// configs.
+	if len(existingNodeList) > 0 {
+		_, err = bddb.Update(updateBp)
+		if err != nil {
+			err = ErrPostgresSet{Err: fmt.Errorf("failed to update existing boot configuration: %w", err)}
+		}
+	}
+
+	return err
+}
+
 // GetBootParamsAll returns a slice of bssTypes.BootParams that contains all of the boot
 // configurations for all nodes in the database. Each item contains node information (boot MAC
 // address (if present), XName (if present), NID (if present)) as well as its associated boot
