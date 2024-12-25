@@ -1728,7 +1728,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 		// depending on them.
 		delBgbc := true
 		for _, n := range nList {
-			if _, ok := nToBgbc[n]; !ok {
+			if _, ok := nToBgbc[n]; ok {
 				delBgbc = false
 				break
 			}
