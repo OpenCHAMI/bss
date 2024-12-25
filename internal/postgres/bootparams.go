@@ -505,23 +505,25 @@ func (bddb BootDataDatabase) getNodesWithConfigs(macs, xnames []string, nids []i
 		` FROM nodes AS n` +
 		` JOIN boot_group_assignments AS bga ON n.id=bga.node_id` +
 		` JOIN boot_groups AS bg ON bga.boot_group_id=bg.id` +
-		` JOIN boot_configs AS bc ON bg.boot_config_id=bc.id` +
-		` WHERE`
-	lengths := []int{len(macs), len(xnames), len(nids)}
-	for first, i := true, 0; i < len(lengths); i++ {
-		if lengths[i] > 0 {
-			if !first {
-				qstr += ` OR`
+		` JOIN boot_configs AS bc ON bg.boot_config_id=bc.id`
+	if len(macs) > 0 || len(xnames) > 0 || len(nids) > 0 {
+		qstr += ` WHERE`
+		lengths := []int{len(macs), len(xnames), len(nids)}
+		for first, i := true, 0; i < len(lengths); i++ {
+			if lengths[i] > 0 {
+				if !first {
+					qstr += ` OR`
+				}
+				switch i {
+				case 0:
+					qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macs))
+				case 1:
+					qstr += fmt.Sprintf(` xname IN %s`, stringSliceToSql(xnames))
+				case 2:
+					qstr += fmt.Sprintf(` nid IN %s`, int32SliceToSql(nids))
+				}
+				first = false
 			}
-			switch i {
-			case 0:
-				qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macs))
-			case 1:
-				qstr += fmt.Sprintf(` xname IN %s`, stringSliceToSql(xnames))
-			case 2:
-				qstr += fmt.Sprintf(` nid IN %s`, int32SliceToSql(nids))
-			}
-			first = false
 		}
 	}
 	qstr += `;`
