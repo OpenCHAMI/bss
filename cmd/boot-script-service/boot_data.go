@@ -484,10 +484,15 @@ func SqlGetBootParams(macs, xnames []string, nids []int32) (results []bssTypes.B
 }
 
 func StoreNew(bp bssTypes.BootParams) (error, string) {
-	// postgres.Add will handle duplicates, and it is called in New().
-	// Therefore, if Postgres is enabled, simply call Store().
+	// postgres.Add will handle duplicates.
 	if useSQL {
-		return Store(bp)
+		debugf("postgres.Add(%v)\n", bp)
+		if result, err := bssdb.Add(bp); err != nil {
+			return err, ""
+		} else {
+			debugf("postgres.Add(%v) result: %v\n", bp, result)
+			return err, uuid.New().String()
+		}
 	}
 
 	item := ""
@@ -544,13 +549,12 @@ func Store(bp bssTypes.BootParams) (error, string) {
 	debugf("Store(%v)\n", bp)
 
 	if useSQL {
-		debugf("postgres.Add(%v)\n", bp)
-		result, err := bssdb.Add(bp)
-		if err != nil {
+		debugf("postgres.Set(%v)\n", bp)
+		if err := bssdb.Set(bp); err != nil {
 			return err, ""
+		} else {
+			return err, uuid.New().String()
 		}
-		debugf("postgres.Add result: %v\n", result)
-		return err, uuid.New().String()
 	}
 
 	var kernel_id, initrd_id string

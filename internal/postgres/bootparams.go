@@ -91,7 +91,7 @@ func NewBootGroup(bcId, bgName, bgDesc string) (bg BootGroup) {
 // kernelUri is blank, an error is returned.
 func NewBootConfig(kernelUri, initrdUri, cmdline string) (bc BootConfig, err error) {
 	if kernelUri == "" {
-		err = fmt.Errorf("Kernel URI cannot be blank")
+		err = fmt.Errorf("kernel URI cannot be blank")
 		return BootConfig{}, err
 	}
 	bc.KernelUri = kernelUri
@@ -106,7 +106,7 @@ func NewBootConfig(kernelUri, initrdUri, cmdline string) (bc BootConfig, err err
 // nodeId is blank, an error is returned.
 func NewBootGroupAssignment(bgId, nodeId string) (bga BootGroupAssignment, err error) {
 	if bgId == "" || nodeId == "" {
-		err = fmt.Errorf("Boot group ID or node MAC cannot be blank")
+		err = fmt.Errorf("boot group ID or node MAC cannot be blank")
 		return BootGroupAssignment{}, err
 	}
 	bga.BootGroupId = bgId
@@ -121,7 +121,7 @@ func (bddb BootDataDatabase) addNodes(nodes []Node) (err error) {
 	for _, n := range nodes {
 		_, err = bddb.DB.Exec(execStr, n.Id, n.BootMac, n.Xname, n.Nid)
 		if err != nil {
-			err = fmt.Errorf("Error executing query to add node %v: %v", n, err)
+			err = fmt.Errorf("error executing query to add node %v: %w", n, err)
 			return err
 		}
 	}
@@ -135,7 +135,7 @@ func (bddb BootDataDatabase) addBootConfigs(bc []BootConfig) (err error) {
 	for _, b := range bc {
 		_, err := bddb.DB.Exec(execStr, b.Id, b.KernelUri, b.InitrdUri, b.Cmdline)
 		if err != nil {
-			err = fmt.Errorf("Error executing query to add boot configs: %v", err)
+			err = fmt.Errorf("error executing query to add boot configs: %w", err)
 			return err
 		}
 	}
@@ -149,7 +149,7 @@ func (bddb BootDataDatabase) addBootGroups(bg []BootGroup) (err error) {
 	for _, b := range bg {
 		_, err = bddb.DB.Exec(execStr, b.Id, b.BootConfigId, b.Name, b.Description)
 		if err != nil {
-			err = fmt.Errorf("Error executing query to add boot groups: %v", err)
+			err = fmt.Errorf("error executing query to add boot groups: %w", err)
 			return err
 		}
 	}
@@ -164,7 +164,7 @@ func (bddb BootDataDatabase) addBootGroupAssignments(bga []BootGroupAssignment) 
 	for _, b := range bga {
 		_, err = bddb.DB.Exec(execStr, b.BootGroupId, b.NodeId)
 		if err != nil {
-			err = fmt.Errorf("Error executing query to add boot group assignments: %v", err)
+			err = fmt.Errorf("error executing query to add boot group assignments: %w", err)
 			return err
 		}
 	}
@@ -175,11 +175,11 @@ func (bddb BootDataDatabase) addBootGroupAssignments(bga []BootGroupAssignment) 
 // boot group (and thus, a different boot config).
 func (bddb BootDataDatabase) updateNodeAssignment(nodeIds []string, bgId string) (err error) {
 	if len(nodeIds) == 0 {
-		err = fmt.Errorf("No node IDs specified")
+		err = fmt.Errorf("no node IDs specified")
 		return err
 	}
 	if len(bgId) == 0 {
-		err = fmt.Errorf("No boot group ID specified")
+		err = fmt.Errorf("no boot group ID specified")
 		return err
 	}
 
@@ -188,7 +188,7 @@ func (bddb BootDataDatabase) updateNodeAssignment(nodeIds []string, bgId string)
 		`;`
 	_, err = bddb.DB.Exec(execStr, bgId)
 	if err != nil {
-		err = fmt.Errorf("Error executing update on boot group assignments: %v", err)
+		err = fmt.Errorf("error executing update on boot group assignments: %w", err)
 		return err
 	}
 
@@ -201,7 +201,7 @@ func (bddb BootDataDatabase) GetNodes() ([]Node, error) {
 	qstr := `SELECT * FROM nodes;`
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not query node table in boot database: %v", err)
+		err = fmt.Errorf("could not query node table in boot database: %w", err)
 		return nodeList, err
 	}
 	defer rows.Close()
@@ -210,14 +210,14 @@ func (bddb BootDataDatabase) GetNodes() ([]Node, error) {
 		var n Node
 		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
 		if err != nil {
-			err = fmt.Errorf("Could not scan results into Node: %v", err)
+			err = fmt.Errorf("could not scan results into Node: %w", err)
 			return nodeList, err
 		}
 		nodeList = append(nodeList, n)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse query results: %v", err)
+		err = fmt.Errorf("could not parse query results: %w", err)
 		return nodeList, err
 	}
 
@@ -234,7 +234,7 @@ func (bddb BootDataDatabase) CheckNodeExistence(macs, xnames []string, nids []in
 	// Get nodes that exist.
 	existingNodes, err = bddb.GetNodesByItems(macs, xnames, nids)
 	if err != nil {
-		err = fmt.Errorf("Error checking node existence for macs=%v xnames=%v nids=%v: %v", macs, xnames, nids, err)
+		err = fmt.Errorf("error checking node existence for macs=%v xnames=%v nids=%v: %w", macs, xnames, nids, err)
 		return existingNodes, nonExistingMacs, nonExistingXnames, nonExistingNids, err
 	}
 
@@ -311,7 +311,7 @@ func (bddb BootDataDatabase) GetNodesByItems(macs, xnames []string, nids []int32
 	qstr += `;`
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not query node table in boot database: %v", err)
+		err = fmt.Errorf("could not query node table in boot database: %w", err)
 		return nodeList, err
 	}
 	defer rows.Close()
@@ -320,14 +320,14 @@ func (bddb BootDataDatabase) GetNodesByItems(macs, xnames []string, nids []int32
 		var n Node
 		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
 		if err != nil {
-			err = fmt.Errorf("Could not scan results into Node: %v", err)
+			err = fmt.Errorf("could not scan results into Node: %w", err)
 			return nodeList, err
 		}
 		nodeList = append(nodeList, n)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse query results: %v", err)
+		err = fmt.Errorf("could not parse query results: %w", err)
 		return nodeList, err
 	}
 
@@ -349,7 +349,7 @@ func (bddb BootDataDatabase) GetNodesByBootGroupId(bgId string) ([]Node, error) 
 		fmt.Sprintf(` WHERE bga.boot_group_id='%s';`, bgId)
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("postgres.GetNodesByBootGroupId: Unable to query database: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetNodesByBootGroupID: unable to query database: %w", err)}
 		return nodeList, err
 	}
 
@@ -360,14 +360,14 @@ func (bddb BootDataDatabase) GetNodesByBootGroupId(bgId string) ([]Node, error) 
 		var n Node
 		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
 		if err != nil {
-			err = fmt.Errorf("postgres.GetNodesByBootGroupId: Could not scan SQL result: %v", err)
+			err = ErrPostgresGet{Err: fmt.Errorf("GetNodesByBootGroupId: could not scan SQL result: %w", err)}
 			return nodeList, err
 		}
 		nodeList = append(nodeList, n)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("postgres.GetNodesByBootGroupId: Could not parse query results: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetNodesByBootGroupId: could not parse query results: %w", err)}
 		return nodeList, err
 	}
 
@@ -389,7 +389,7 @@ func (bddb BootDataDatabase) GetBootConfigsAll() ([]BootGroup, []BootConfig, int
 		";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("postgres.GetBootConfigsAll: Unable to query database: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootConfigsAll: unable to query database: %w", err)}
 		return bgResults, bcResults, numResults, err
 	}
 	defer rows.Close()
@@ -405,7 +405,7 @@ func (bddb BootDataDatabase) GetBootConfigsAll() ([]BootGroup, []BootConfig, int
 		err = rows.Scan(&bg.Id, &bg.Name, &bg.Description,
 			&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
 		if err != nil {
-			err = fmt.Errorf("postgres.GetBootConfigsAll: Could not scan SQL result: %v", err)
+			err = ErrPostgresGet{Err: fmt.Errorf("GetBootConfigsAll: could not scan SQL result: %w", err)}
 			return bgResults, bcResults, numResults, err
 		}
 		bg.BootConfigId = bc.Id
@@ -416,7 +416,7 @@ func (bddb BootDataDatabase) GetBootConfigsAll() ([]BootGroup, []BootConfig, int
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("postgres.GetBootConfigsAll: Could not parse query results: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootConfigsAll: could not parse query results: %w", err)}
 		return bgResults, bcResults, numResults, err
 	}
 
@@ -461,7 +461,7 @@ func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline
 	qstr += ";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("postgres.GetBootConfigsAll: Unable to query database: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootConfigsAll: unable to query database: %w", err)}
 		return bgResults, bcResults, numResults, err
 	}
 	defer rows.Close()
@@ -477,7 +477,7 @@ func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline
 		err = rows.Scan(&bg.Id, &bg.Name, &bg.Description,
 			&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
 		if err != nil {
-			err = fmt.Errorf("postgres.GetBootConfigsAll: Could not scan SQL result: %v", err)
+			err = ErrPostgresGet{Err: fmt.Errorf("GetBootConfigsAll: could not scan SQL result: %w", err)}
 			return bgResults, bcResults, numResults, err
 		}
 		bg.BootConfigId = bc.Id
@@ -488,7 +488,7 @@ func (bddb BootDataDatabase) GetBootConfigsByItems(kernelUri, initrdUri, cmdline
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("postgres.GetBootConfigsAll: Could not parse query results: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootConfigsAll: could not parse query results: %w", err)}
 		return bgResults, bcResults, numResults, err
 	}
 
@@ -529,7 +529,7 @@ func (bddb BootDataDatabase) getNodesWithConfigs(macs, xnames []string, nids []i
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not query nodes with boot configs: %v", err)
+		err = fmt.Errorf("could not query nodes with boot configs: %w", err)
 		return nToBgbc, err
 	}
 	defer rows.Close()
@@ -543,7 +543,7 @@ func (bddb BootDataDatabase) getNodesWithConfigs(macs, xnames []string, nids []i
 			&cfg.Bg.Id, &cfg.Bg.Name, &cfg.Bg.Description,
 			&cfg.Bc.Id, &cfg.Bc.KernelUri, &cfg.Bc.InitrdUri, &cfg.Bc.Cmdline)
 		if err != nil {
-			err = fmt.Errorf("Could not scan query results: %v", err)
+			err = fmt.Errorf("could not scan query results: %w", err)
 			return nToBgbc, err
 		}
 		cfg.Bg.BootConfigId = cfg.Bc.Id
@@ -552,7 +552,7 @@ func (bddb BootDataDatabase) getNodesWithConfigs(macs, xnames []string, nids []i
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Error parsing query results: %v", err)
+		err = fmt.Errorf("error parsing query results: %w", err)
 		return nToBgbc, err
 	}
 
@@ -565,7 +565,7 @@ func (bddb BootDataDatabase) getConfigsWithNodes(nodeIds []string) (map[bgbc][]N
 	bgbcToN := make(map[bgbc][]Node)
 
 	if len(nodeIds) == 0 {
-		err = fmt.Errorf("No node IDs specified")
+		err = fmt.Errorf("no node IDs specified")
 		return bgbcToN, err
 	}
 
@@ -577,7 +577,7 @@ func (bddb BootDataDatabase) getConfigsWithNodes(nodeIds []string) (map[bgbc][]N
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not query boot configs and groups from node IDs: %v", err)
+		err = fmt.Errorf("could not query boot configs and groups from node IDs: %w", err)
 		return bgbcToN, err
 	}
 	defer rows.Close()
@@ -587,7 +587,7 @@ func (bddb BootDataDatabase) getConfigsWithNodes(nodeIds []string) (map[bgbc][]N
 		var bgId string
 		err = rows.Scan(&bgId)
 		if err != nil {
-			err = fmt.Errorf("Could not scan query results: %v", err)
+			err = fmt.Errorf("could not scan query results: %w", err)
 			return bgbcToN, err
 		}
 
@@ -595,7 +595,7 @@ func (bddb BootDataDatabase) getConfigsWithNodes(nodeIds []string) (map[bgbc][]N
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Error parsing query results: %v", err)
+		err = fmt.Errorf("error parsing query results: %w", err)
 		return bgbcToN, err
 	}
 	rows.Close()
@@ -612,7 +612,7 @@ func (bddb BootDataDatabase) getConfigsWithNodes(nodeIds []string) (map[bgbc][]N
 
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not query boot configs with nodes: %v", err)
+		err = fmt.Errorf("could not query boot configs with nodes: %w", err)
 		return bgbcToN, err
 	}
 
@@ -625,7 +625,7 @@ func (bddb BootDataDatabase) getConfigsWithNodes(nodeIds []string) (map[bgbc][]N
 			&cfg.Bc.Id, &cfg.Bc.KernelUri, &cfg.Bc.InitrdUri, &cfg.Bc.Cmdline,
 			&n.Id, &n.BootMac, &n.Xname, &n.Nid)
 		if err != nil {
-			err = fmt.Errorf("Could not scan query results: %v", err)
+			err = fmt.Errorf("could not scan query results: %w", err)
 			return bgbcToN, err
 		}
 		cfg.Bg.BootConfigId = cfg.Bc.Id
@@ -639,7 +639,7 @@ func (bddb BootDataDatabase) getConfigsWithNodes(nodeIds []string) (map[bgbc][]N
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Error parsing query results: %v", err)
+		err = fmt.Errorf("error parsing query results: %w", err)
 		return bgbcToN, err
 	}
 
@@ -653,7 +653,7 @@ func (bddb BootDataDatabase) addBootConfigByGroup(groupNames []string, kernelUri
 	results := make(map[string]string)
 
 	if len(groupNames) == 0 {
-		return results, fmt.Errorf("No group names specified to add")
+		return results, fmt.Errorf("no group names specified to add")
 	}
 
 	// See if group name exists, if passed.
@@ -664,7 +664,7 @@ func (bddb BootDataDatabase) addBootConfigByGroup(groupNames []string, kernelUri
 	qstr := fmt.Sprintf(`SELECT * FROM boot_groups WHERE name IN %s;`, stringSliceToSql(existingBgNames))
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Unable to query boot database: %v", err)
+		err = fmt.Errorf("unable to query boot database: %w", err)
 		return results, err
 	}
 	defer rows.Close()
@@ -677,14 +677,14 @@ func (bddb BootDataDatabase) addBootConfigByGroup(groupNames []string, kernelUri
 		var bg BootGroup
 		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
 		if err != nil {
-			err = fmt.Errorf("Could not scan SQL result: %v", err)
+			err = fmt.Errorf("could not scan SQL result: %w", err)
 			return results, err
 		}
 		bgMap[bg.Name] = bg
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse query results: %v", err)
+		err = fmt.Errorf("could not parse query results: %w", err)
 		return results, err
 	}
 	// If not, we are done processing the list of names. Check matches, if any.
@@ -710,7 +710,7 @@ func (bddb BootDataDatabase) addBootConfigByGroup(groupNames []string, kernelUri
 			var bc BootConfig
 			bc, err = NewBootConfig(kernelUri, initrdUri, cmdline)
 			if err != nil {
-				err = fmt.Errorf("Could not create BootConfig: %v", err)
+				err = fmt.Errorf("could not create BootConfig: %w", err)
 				return results, err
 			}
 
@@ -738,7 +738,7 @@ func (bddb BootDataDatabase) addBootConfigByGroup(groupNames []string, kernelUri
 		if len(bgList) > 0 {
 			err = bddb.addBootGroups(bgList)
 			if err != nil {
-				err = fmt.Errorf("postgres.Add: %v", err)
+				err = fmt.Errorf("failed to add boot groups: %w", err)
 				return results, err
 			}
 		}
@@ -747,7 +747,7 @@ func (bddb BootDataDatabase) addBootConfigByGroup(groupNames []string, kernelUri
 		if len(bcList) > 0 {
 			err = bddb.addBootConfigs(bcList)
 			if err != nil {
-				err = fmt.Errorf("postgres.Add: %v", err)
+				err = fmt.Errorf("failed to add boot configs: %w", err)
 				return results, err
 			}
 		}
@@ -781,11 +781,11 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 		bgaList        []BootGroupAssignment
 	)
 	if len(nodeList) == 0 {
-		return result, fmt.Errorf("No nodes specified to add boot configurations for")
+		return result, fmt.Errorf("no nodes specified to add boot configurations for")
 	}
 	existingBgList, existingBcList, numResults, err = bddb.GetBootConfigsByItems(kernelUri, initrdUri, cmdline)
 	if err != nil {
-		err = fmt.Errorf("Could not get boot configs by kernel/initrd URI or params: %v", err)
+		err = fmt.Errorf("could not get boot configs by kernel/initrd URI or params: %w", err)
 		return result, err
 	}
 	// Create boot group and boot config with these parameters so we can compare them
@@ -794,7 +794,7 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 	bgDesc := fmt.Sprintf("Boot group for nodes with kernel=%q initrd=%q params=%q", kernelUri, initrdUri, cmdline)
 	bc, err = NewBootConfig(kernelUri, initrdUri, cmdline)
 	if err != nil {
-		err = fmt.Errorf("Could not create BootConfig: %v", err)
+		err = fmt.Errorf("could not create BootConfig: %w", err)
 		return result, err
 	}
 	bg = NewBootGroup(bc.Id, bgName, bgDesc)
@@ -823,7 +823,7 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 		var bga BootGroupAssignment
 		bga, err = NewBootGroupAssignment(bg.Id, node.Id)
 		if err != nil {
-			err = fmt.Errorf("Could not create BootGroupAssignment: %v", err)
+			err = fmt.Errorf("could not create BootGroupAssignment: %w", err)
 			return result, err
 		}
 		bgaList = append(bgaList, bga)
@@ -835,14 +835,14 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 		// Add new boot configs to boot_configs table.
 		err = bddb.addBootConfigs([]BootConfig{bc})
 		if err != nil {
-			err = fmt.Errorf("Could not add BootConfig %v: %v", bc, err)
+			err = fmt.Errorf("could not add BootConfig %v: %w", bc, err)
 			return result, err
 		}
 
 		// Add new boot groups to boot_groups table.
 		err = bddb.addBootGroups([]BootGroup{bg})
 		if err != nil {
-			err = fmt.Errorf("Could not add BootGroup %v: %v", bg, err)
+			err = fmt.Errorf("could not add BootGroup %v: %w", bg, err)
 			return result, err
 		}
 
@@ -853,14 +853,14 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 	// Add new nodes to nodes table.
 	err = bddb.addNodes(nodeList)
 	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
+		err = fmt.Errorf("failed to add nodes: %w", err)
 		return result, err
 	}
 
 	// Add new boot group assignments to boot_group_assignments table.
 	err = bddb.addBootGroupAssignments(bgaList)
 	if err != nil {
-		err = fmt.Errorf("Could not add BootGroupAssignments %v: %v", bgaList, err)
+		err = fmt.Errorf("could not add BootGroupAssignments %v: %w", bgaList, err)
 		return result, err
 	}
 
@@ -872,7 +872,7 @@ func (bddb BootDataDatabase) addBootConfigByNode(nodeList []Node, kernelUri, ini
 // with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootGroupsByName(names []string) (bgList []BootGroup, err error) {
 	if len(names) == 0 {
-		err = fmt.Errorf("No boot group names specified to delete")
+		err = fmt.Errorf("no boot group names specified to delete")
 		return bgList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -880,7 +880,7 @@ func (bddb BootDataDatabase) deleteBootGroupsByName(names []string) (bgList []Bo
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform boot group deletion in database: %v", err)
+		err = fmt.Errorf("could not perform boot group deletion in database: %w", err)
 		return bgList, err
 	}
 	defer rows.Close()
@@ -889,14 +889,14 @@ func (bddb BootDataDatabase) deleteBootGroupsByName(names []string) (bgList []Bo
 		var bg BootGroup
 		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into BootGroup: %v", err)
+			err = fmt.Errorf("could not scan deletion results into BootGroup: %w", err)
 			return bgList, err
 		}
 		bgList = append(bgList, bg)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return bgList, err
 	}
 
@@ -908,7 +908,7 @@ func (bddb BootDataDatabase) deleteBootGroupsByName(names []string) (bgList []Bo
 // an error occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootGroupsById(bgIds []string) (bgList []BootGroup, err error) {
 	if len(bgIds) == 0 {
-		err = fmt.Errorf("No boot group IDs specified to delete")
+		err = fmt.Errorf("no boot group IDs specified to delete")
 		return bgList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -916,7 +916,7 @@ func (bddb BootDataDatabase) deleteBootGroupsById(bgIds []string) (bgList []Boot
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform boot group deletion in database: %v", err)
+		err = fmt.Errorf("could not perform boot group deletion in database: %w", err)
 		return bgList, err
 	}
 	defer rows.Close()
@@ -925,14 +925,14 @@ func (bddb BootDataDatabase) deleteBootGroupsById(bgIds []string) (bgList []Boot
 		var bg BootGroup
 		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into BootGroup: %v", err)
+			err = fmt.Errorf("could not scan deletion results into BootGroup: %w", err)
 			return bgList, err
 		}
 		bgList = append(bgList, bg)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return bgList, err
 	}
 
@@ -944,7 +944,7 @@ func (bddb BootDataDatabase) deleteBootGroupsById(bgIds []string) (bgList []Boot
 // with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootConfigsById(bcIds []string) (bcList []BootConfig, err error) {
 	if len(bcIds) == 0 {
-		err = fmt.Errorf("No boot config IDs specified to delete")
+		err = fmt.Errorf("no boot config IDs specified to delete")
 		return bcList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -952,7 +952,7 @@ func (bddb BootDataDatabase) deleteBootConfigsById(bcIds []string) (bcList []Boo
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform boot config deletion in database: %v", err)
+		err = fmt.Errorf("could not perform boot config deletion in database: %w", err)
 		return bcList, err
 	}
 	defer rows.Close()
@@ -961,14 +961,14 @@ func (bddb BootDataDatabase) deleteBootConfigsById(bcIds []string) (bcList []Boo
 		var bc BootConfig
 		err = rows.Scan(&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into BootConfig: %v", err)
+			err = fmt.Errorf("could not scan deletion results into BootConfig: %w", err)
 			return bcList, err
 		}
 		bcList = append(bcList, bc)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return bcList, err
 	}
 
@@ -1006,7 +1006,7 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 	qstr += ` RETURNING *;`
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform boot config deletion in database: %v", err)
+		err = fmt.Errorf("could not perform boot config deletion in database: %w", err)
 		return nodeList, bcList, err
 	}
 	defer rows.Close()
@@ -1015,14 +1015,14 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 		var bc BootConfig
 		err = rows.Scan(&bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into BootConfig: %v", err)
+			err = fmt.Errorf("could not scan deletion results into BootConfig: %w", err)
 			return nodeList, bcList, err
 		}
 		bcList = append(bcList, bc)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return nodeList, bcList, err
 	}
 	rows.Close()
@@ -1035,7 +1035,7 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 		` RETURNING *;`
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform boot group deletion: %v", err)
+		err = fmt.Errorf("could not perform boot group deletion: %w", err)
 		return nodeList, bcList, err
 	}
 	var bgIdList []string
@@ -1043,14 +1043,14 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 		var bg BootGroup
 		err = rows.Scan(&bg.Id, &bg.BootConfigId, &bg.Name, &bg.Description)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into BootConfig: %v", err)
+			err = fmt.Errorf("could not scan deletion results into BootConfig: %w", err)
 			return nodeList, bcList, err
 		}
 		bgIdList = append(bgIdList, bg.Id)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return nodeList, bcList, err
 	}
 	rows.Close()
@@ -1059,7 +1059,7 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 		` RETURNING *;`
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform boot group assignment deletion: %v", err)
+		err = fmt.Errorf("could not perform boot group assignment deletion: %w", err)
 		return nodeList, bcList, err
 	}
 	var nodeIdList []string
@@ -1067,14 +1067,14 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 		var bga BootGroupAssignment
 		err = rows.Scan(&bga.BootGroupId, &bga.NodeId)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into BootGroupAssignment: %v", err)
+			err = fmt.Errorf("could not scan deletion results into BootGroupAssignment: %w", err)
 			return nodeList, bcList, err
 		}
 		nodeIdList = append(nodeIdList, bga.NodeId)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return nodeList, bcList, err
 	}
 	rows.Close()
@@ -1083,21 +1083,21 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 		` RETURNING *;`
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform node deletion: %v", err)
+		err = fmt.Errorf("could not perform node deletion: %w", err)
 		return nodeList, bcList, err
 	}
 	for rows.Next() {
 		var n Node
 		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into Node: %v", err)
+			err = fmt.Errorf("could not scan deletion results into Node: %w", err)
 			return nodeList, bcList, err
 		}
 		nodeList = append(nodeList, n)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return nodeList, bcList, err
 	}
 
@@ -1109,7 +1109,7 @@ func (bddb BootDataDatabase) deleteBootConfigsByItems(kernelUri, initrdUri, cmdl
 // were deleted. If an error occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootGroupAssignmentsByGroupId(bgIds []string) (bgaList []BootGroupAssignment, err error) {
 	if len(bgIds) == 0 {
-		err = fmt.Errorf("No boot group IDs specified for deleting boot group assignments")
+		err = fmt.Errorf("no boot group IDs specified for deleting boot group assignments")
 		return bgaList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -1117,7 +1117,7 @@ func (bddb BootDataDatabase) deleteBootGroupAssignmentsByGroupId(bgIds []string)
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform boot group assignment deletion in database: %v", err)
+		err = fmt.Errorf("could not perform boot group assignment deletion in database: %w", err)
 		return bgaList, err
 	}
 	defer rows.Close()
@@ -1126,14 +1126,14 @@ func (bddb BootDataDatabase) deleteBootGroupAssignmentsByGroupId(bgIds []string)
 		var bga BootGroupAssignment
 		err = rows.Scan(&bga.BootGroupId, &bga.NodeId)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into BootGroupAssignment: %v", err)
+			err = fmt.Errorf("could not scan deletion results into BootGroupAssignment: %w", err)
 			return bgaList, err
 		}
 		bgaList = append(bgaList, bga)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return bgaList, err
 	}
 
@@ -1145,7 +1145,7 @@ func (bddb BootDataDatabase) deleteBootGroupAssignmentsByGroupId(bgIds []string)
 // occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteBootGroupAssignmentsByNodeId(nodeIds []string) (bgaList []BootGroupAssignment, err error) {
 	if len(nodeIds) == 0 {
-		err = fmt.Errorf("No node IDs specified for deleting boot group assignments")
+		err = fmt.Errorf("no node IDs specified for deleting boot group assignments")
 		return bgaList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -1153,7 +1153,7 @@ func (bddb BootDataDatabase) deleteBootGroupAssignmentsByNodeId(nodeIds []string
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform boot group assignment deletion in database: %v", err)
+		err = fmt.Errorf("could not perform boot group assignment deletion in database: %w", err)
 		return bgaList, err
 	}
 	defer rows.Close()
@@ -1162,14 +1162,14 @@ func (bddb BootDataDatabase) deleteBootGroupAssignmentsByNodeId(nodeIds []string
 		var bga BootGroupAssignment
 		err = rows.Scan(&bga.BootGroupId, &bga.NodeId)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into BootGroupAssignment: %v", err)
+			err = fmt.Errorf("could not scan deletion results into BootGroupAssignment: %w", err)
 			return bgaList, err
 		}
 		bgaList = append(bgaList, bga)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return bgaList, err
 	}
 
@@ -1180,7 +1180,7 @@ func (bddb BootDataDatabase) deleteBootGroupAssignmentsByNodeId(nodeIds []string
 // an error occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteNodesById(nodeIds []string) (nodeList []Node, err error) {
 	if len(nodeIds) == 0 {
-		err = fmt.Errorf("No node IDs specified for deletion")
+		err = fmt.Errorf("no node IDs specified for deletion")
 		return nodeList, err
 	}
 	// "RETURNING *" is Postgres-specific.
@@ -1188,7 +1188,7 @@ func (bddb BootDataDatabase) deleteNodesById(nodeIds []string) (nodeList []Node,
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform node deletion in database: %v", err)
+		err = fmt.Errorf("could not perform node deletion in database: %w", err)
 		return nodeList, err
 	}
 	defer rows.Close()
@@ -1197,14 +1197,14 @@ func (bddb BootDataDatabase) deleteNodesById(nodeIds []string) (nodeList []Node,
 		var n Node
 		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into Node: %v", err)
+			err = fmt.Errorf("could not scan deletion results into Node: %w", err)
 			return nodeList, err
 		}
 		nodeList = append(nodeList, n)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return nodeList, err
 	}
 
@@ -1216,7 +1216,7 @@ func (bddb BootDataDatabase) deleteNodesById(nodeIds []string) (nodeList []Node,
 // nodes is returned. If an error occurs with any of the SQL queries, it is returned.
 func (bddb BootDataDatabase) deleteNodesByItems(hosts, macs []string, nids []int32) (nodeList []Node, err error) {
 	if len(hosts) == 0 && len(macs) == 0 && len(nids) == 0 {
-		err = fmt.Errorf("No hosts, MAC addresses, or NIDs specified to delete nodes")
+		err = fmt.Errorf("no hosts, MAC addresses, or NIDs specified to delete nodes")
 		return nodeList, err
 	}
 	qstr := `DELETE FROM nodes WHERE`
@@ -1247,7 +1247,7 @@ func (bddb BootDataDatabase) deleteNodesByItems(hosts, macs []string, nids []int
 	var rows *sql.Rows
 	rows, err = bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("Could not perform node deletion in database: %v", err)
+		err = fmt.Errorf("could not perform node deletion in database: %w", err)
 		return nodeList, err
 	}
 	defer rows.Close()
@@ -1256,14 +1256,14 @@ func (bddb BootDataDatabase) deleteNodesByItems(hosts, macs []string, nids []int
 		var n Node
 		err = rows.Scan(&n.Id, &n.BootMac, &n.Xname, &n.Nid)
 		if err != nil {
-			err = fmt.Errorf("Could not scan deletion results into Node: %v", err)
+			err = fmt.Errorf("could not scan deletion results into Node: %w", err)
 			return nodeList, err
 		}
 		nodeList = append(nodeList, n)
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("Could not parse deletion query results: %v", err)
+		err = fmt.Errorf("could not parse deletion query results: %w", err)
 		return nodeList, err
 	}
 
@@ -1276,13 +1276,13 @@ func (bddb BootDataDatabase) deleteNodesByItems(hosts, macs []string, nids []int
 // SQL queries occurs, it is returned.
 func (bddb BootDataDatabase) deleteBootConfigByGroup(groupNames []string) (nodeList []Node, bcList []BootConfig, err error) {
 	if len(groupNames) == 0 {
-		return nodeList, bcList, fmt.Errorf("No group names specified for deletion")
+		return nodeList, bcList, fmt.Errorf("no group names specified for deletion")
 	}
 
 	// Delete matching boot groups, store deleted ones.
 	bgList, err := bddb.deleteBootGroupsByName(groupNames)
 	if err != nil {
-		err = fmt.Errorf("Error deleting BootGroup(s): %v", err)
+		err = fmt.Errorf("error deleting BootGroup(s): %w", err)
 		return nodeList, bcList, err
 	}
 
@@ -1301,7 +1301,7 @@ func (bddb BootDataDatabase) deleteBootConfigByGroup(groupNames []string) (nodeL
 	// ones.
 	bcList, err = bddb.deleteBootConfigsById(bcIdList)
 	if err != nil {
-		err = fmt.Errorf("Error deleting BootConfig(s): %v", err)
+		err = fmt.Errorf("error deleting BootConfig(s): %w", err)
 		return nodeList, bcList, err
 	}
 
@@ -1310,7 +1310,7 @@ func (bddb BootDataDatabase) deleteBootConfigByGroup(groupNames []string) (nodeL
 	var bgaList []BootGroupAssignment
 	bgaList, err = bddb.deleteBootGroupAssignmentsByGroupId(bgIdList)
 	if err != nil {
-		err = fmt.Errorf("Error deleting BootGroupAssignment(s): %v", err)
+		err = fmt.Errorf("error deleting BootGroupAssignment(s): %w", err)
 		return nodeList, bcList, err
 	}
 
@@ -1323,7 +1323,7 @@ func (bddb BootDataDatabase) deleteBootConfigByGroup(groupNames []string) (nodeL
 	// Delete nodes whose ID matches that of any of the BootGroupAssignments that were deleted.
 	nodeList, err = bddb.deleteNodesById(nodeIdList)
 	if err != nil {
-		err = fmt.Errorf("Error deleting Node(s): %v", err)
+		err = fmt.Errorf("error deleting Node(s): %w", err)
 		return nodeList, bcList, err
 	}
 
@@ -1339,7 +1339,7 @@ func (bddb BootDataDatabase) deleteNodesWithBootConfigs(hosts, macs []string, ni
 	// MAC address comparison is case-insensitive.
 	nodeList, err = bddb.deleteNodesByItems(hosts, macs, nids)
 	if err != nil {
-		err = fmt.Errorf("Error deleting Node(s): %v", err)
+		err = fmt.Errorf("error deleting Node(s): %w", err)
 		return nodeList, bcList, err
 	}
 
@@ -1353,7 +1353,7 @@ func (bddb BootDataDatabase) deleteNodesWithBootConfigs(hosts, macs []string, ni
 	var bgaList []BootGroupAssignment
 	bgaList, err = bddb.deleteBootGroupAssignmentsByNodeId(nodeIdList)
 	if err != nil {
-		err = fmt.Errorf("Error deleting BootGroupAssignment(s): %v", err)
+		err = fmt.Errorf("error deleting BootGroupAssignment(s): %w", err)
 		return nodeList, bcList, err
 	}
 	bgIdMap := make(map[string]string)
@@ -1369,7 +1369,7 @@ func (bddb BootDataDatabase) deleteNodesWithBootConfigs(hosts, macs []string, ni
 	for _, bgId := range bgIdMap {
 		nl, err := bddb.GetNodesByBootGroupId(bgId)
 		if err != nil {
-			err = fmt.Errorf("Could not get nodes by boot group ID: %v", err)
+			err = fmt.Errorf("could not get nodes by boot group ID: %w", err)
 			return nodeList, bcList, err
 		}
 		if len(nl) == 0 {
@@ -1381,7 +1381,7 @@ func (bddb BootDataDatabase) deleteNodesWithBootConfigs(hosts, macs []string, ni
 		var bgList []BootGroup
 		bgList, err = bddb.deleteBootGroupsById(uniqueBgIdList)
 		if err != nil {
-			err = fmt.Errorf("Error deleting BootGroup(s): %v", err)
+			err = fmt.Errorf("error deleting BootGroup(s): %w", err)
 			return nodeList, bcList, err
 		}
 
@@ -1394,7 +1394,7 @@ func (bddb BootDataDatabase) deleteNodesWithBootConfigs(hosts, macs []string, ni
 		// Delete boot configs that were connected to the deleted boot groups.
 		bcList, err = bddb.deleteBootConfigsById(bcIdList)
 		if err != nil {
-			err = fmt.Errorf("Error deleting BootConfig(s): %v", err)
+			err = fmt.Errorf("error deleting BootConfig(s): %w", err)
 			return nodeList, bcList, err
 		}
 	}
@@ -1418,7 +1418,7 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 	// Check nodes table for any nodes that having a matching XName, MAC, or NID.
 	existingNodeList, err := bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
 	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
+		err = ErrPostgresAdd{Err: err}
 		return result, err
 	}
 
@@ -1446,7 +1446,7 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 			// Group name(s) specified, add boot config by group.
 			result, err = bddb.addBootConfigByGroup(groupNames, bp.Kernel, bp.Initrd, bp.Params)
 			if err != nil {
-				err = fmt.Errorf("postgres.Add: %v", err)
+				err = ErrPostgresAdd{Err: err}
 			}
 			return result, err
 		} else if len(xNames) > 0 {
@@ -1455,7 +1455,7 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 			// Check nodes table for any nodes that having a matching XName, MAC, or NID.
 			existingNodeList, err := bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
 			if err != nil {
-				err = fmt.Errorf("postgres.Add: %v", err)
+				err = ErrPostgresAdd{Err: err}
 				return result, err
 			}
 
@@ -1510,14 +1510,14 @@ func (bddb BootDataDatabase) Add(bp bssTypes.BootParams) (result map[string]stri
 	}
 
 	if len(nodesToAdd) == 0 {
-		err = fmt.Errorf("postgres.Add: No nodes to add (possible duplicate(s))")
+		err = ErrPostgresAdd{Err: ErrPostgresDuplicate{}}
 		return result, err
 	}
 
 	// Add any nonexisting nodes, plus their boot config as needed.
 	result, err = bddb.addBootConfigByNode(nodesToAdd, bp.Kernel, bp.Initrd, bp.Params)
 	if err != nil {
-		err = fmt.Errorf("postgres.Add: %v", err)
+		err = ErrPostgresAdd{Err: err}
 	}
 
 	return result, err
@@ -1560,14 +1560,14 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 			// Group name(s) specified, add boot config by group.
 			delNodes, delBcs, err = bddb.deleteBootConfigByGroup(groupNames)
 			if err != nil {
-				err = fmt.Errorf("postgres.Delete: %v", err)
+				err = ErrPostgresDelete{Err: err}
 				return nodesDeleted, bcsDeleted, err
 			}
 		} else if len(xNames) > 0 {
 			// XName(s) specified, delete node(s) and relative boot configs.
 			delNodes, delBcs, err = bddb.deleteNodesWithBootConfigs(xNames, []string{}, []int32{})
 			if err != nil {
-				err = fmt.Errorf("postgres.Delete: %v", err)
+				err = ErrPostgresDelete{Err: err}
 				return nodesDeleted, bcsDeleted, err
 			}
 		}
@@ -1576,7 +1576,7 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 		// converting them to lower case before comparison.
 		delNodes, delBcs, err = bddb.deleteNodesWithBootConfigs([]string{}, bp.Macs, []int32{})
 		if err != nil {
-			err = fmt.Errorf("postgres.Delete: %v", err)
+			err = ErrPostgresDelete{Err: err}
 			return nodesDeleted, bcsDeleted, err
 		}
 
@@ -1589,7 +1589,7 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 	case len(bp.Nids) > 0:
 		delNodes, delBcs, err = bddb.deleteNodesWithBootConfigs([]string{}, []string{}, bp.Nids)
 		if err != nil {
-			err = fmt.Errorf("postgres.Delete: %v", err)
+			err = ErrPostgresDelete{Err: err}
 			return nodesDeleted, bcsDeleted, err
 		}
 
@@ -1603,7 +1603,7 @@ func (bddb BootDataDatabase) Delete(bp bssTypes.BootParams) (nodesDeleted, bcsDe
 	case bp.Kernel != "" || bp.Initrd != "" || bp.Params != "":
 		delNodes, delBcs, err = bddb.deleteBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
 		if err != nil {
-			err = fmt.Errorf("postgres.Delete: %v", err)
+			err = ErrPostgresDelete{Err: err}
 			return nodesDeleted, bcsDeleted, err
 		}
 	}
@@ -1631,10 +1631,14 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	)
 	_, missingMacs, missingXnames, missingNids, err = bddb.CheckNodeExistence(bp.Macs, bp.Hosts, bp.Nids)
 	if err != nil {
-		err = fmt.Errorf("postgres.Update: %v", err)
+		err = ErrPostgresUpdate{Err: err}
 		return nodesUpdated, err
 	} else if len(missingMacs) > 0 || len(missingXnames) > 0 || len(missingNids) > 0 {
-		err = fmt.Errorf("postgres.Update: Nodes do not exist in nodes table: macs=%v xnames=%v nids=%v", missingMacs, missingXnames, missingNids)
+		err = ErrPostgresUpdate{
+			Err: ErrPostgresNotExists{
+				Data: fmt.Sprintf("nodes table: macs=%v xnames=%v nids=%v", missingMacs, missingXnames, missingNids),
+			},
+		}
 		return nodesUpdated, err
 	}
 
@@ -1643,18 +1647,18 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	lenKernUri := len(bp.Kernel)
 	lenInitrdUri := len(bp.Initrd)
 	if lenParams == 0 && lenKernUri == 0 && lenInitrdUri == 0 {
-		err = fmt.Errorf("postgres.Update: Must specify at least one of params, kernel, or initrd")
+		err = ErrPostgresUpdate{Err: fmt.Errorf("must specify at least one of params, kernel, or initrd")}
 		return nodesUpdated, err
 	}
 
 	// Get requested nodes with their corresponding boot group and boot config.
 	//
-	// This is to keep track if which nodes need updating without duplicates (hence the map).
+	// This is to keep track of which nodes need updating without duplicates (hence the map).
 	// The value doesn't really matter here, since this map is used to check node existence.
 	var nToBgbc map[Node]bgbc
 	nToBgbc, err = bddb.getNodesWithConfigs(bp.Macs, bp.Hosts, bp.Nids)
 	if err != nil {
-		err = fmt.Errorf("postgres.Update: %v", err)
+		err = ErrPostgresUpdate{Err: err}
 		return nodesUpdated, err
 	}
 
@@ -1675,13 +1679,13 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	var bgbcToN map[bgbc][]Node
 	bgbcToN, err = bddb.getConfigsWithNodes(nodeIds)
 	if err != nil {
-		err = fmt.Errorf("postgres.Update: %v", err)
+		err = ErrPostgresUpdate{Err: err}
 		return nodesUpdated, err
 	}
 
 	// Query for boot configs/groups that have a similar config to that passed.
 	//
-	// This is to make sure a duplicate boot config/group is added. When the boot configs/groups
+	// This is to make sure a duplicate boot config/group is not added. When the boot configs/groups
 	// are created for the nodes later (since the passed config is only partial), we compare
 	// them to configs in this map and do not add it to the database if it already exists.
 	var (
@@ -1692,7 +1696,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	similarBcs := make(map[BootConfig]BootGroup)
 	sBgs, sBcs, lenSBcs, err = bddb.GetBootConfigsByItems(bp.Kernel, bp.Initrd, bp.Params)
 	if err != nil {
-		err = fmt.Errorf("postgres.Update: %v", err)
+		err = ErrPostgresUpdate{Err: err}
 		return nodesUpdated, err
 	}
 	for i := 0; i < lenSBcs; i++ {
@@ -1704,7 +1708,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	// Determine boot configs/groups that need to be created, deleted, or left alone.
 	//
 	// Here, we have bgbcToN, which stores the boot configs/groups that correspond with nodes
-	// that were specified mapped to _all_ of the nodes that each boot confnig/group corresponds
+	// that were specified mapped to _all_ of the nodes that each boot config/group corresponds
 	// with. We also have nToBgbc, which stores each node that was specified mapped to the boot
 	// config/group it corresponds with. We compare data between the two to determine which boot
 	// configs/groups we can delete (no more nodes depend on it) and which we cannot (other
@@ -1764,7 +1768,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 		newBgDesc := fmt.Sprintf("Boot group for nodes with kernel=%q initrd=%q params=%q", newKernel, newInitrd, newParams)
 		newBgbc.Bc, err = NewBootConfig(newKernel, newInitrd, newParams)
 		if err != nil {
-			err = fmt.Errorf("postgres.Update: Could not create new BootConfig: %v", err)
+			err = ErrPostgresUpdate{Err: fmt.Errorf("could not create new BootConfig: %w", err)}
 			return nodesUpdated, err
 		}
 		newBgbc.Bg = NewBootGroup(newBgbc.Bc.Id, newBgName, newBgDesc)
@@ -1823,7 +1827,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	execStr += ` DELETE FROM boot_groups bg WHERE bg.boot_config_id IN ` + stringSliceToSql(bcIds) + `;`
 	_, err = bddb.DB.Exec(execStr)
 	if err != nil {
-		err = fmt.Errorf("postgres.Update: Could not perform boot group/config deletion: %v", err)
+		err = ErrPostgresUpdate{Err: fmt.Errorf("could not perform boot group/config deletion: %w", err)}
 		return nodesUpdated, err
 	}
 
@@ -1836,12 +1840,12 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	}
 	err = bddb.addBootConfigs(bcList)
 	if err != nil {
-		err = fmt.Errorf("postgres.Update: Could not add boot config(s): %v", err)
+		err = ErrPostgresUpdate{Err: fmt.Errorf("could not add boot config(s): %w", err)}
 		return nodesUpdated, err
 	}
 	err = bddb.addBootGroups(bgList)
 	if err != nil {
-		err = fmt.Errorf("postgres.Update: Could not add boot group(s): %v", err)
+		err = ErrPostgresUpdate{Err: fmt.Errorf("could not add boot config(s): %w", err)}
 		return nodesUpdated, err
 	}
 
@@ -1853,7 +1857,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 		}
 		err = bddb.updateNodeAssignment(nodeIds, bgbc.Bg.Id)
 		if err != nil {
-			err = fmt.Errorf("postgres.Update: Could not update boot group assignments for nodes=%v: %v", nodeList, err)
+			err = ErrPostgresUpdate{Err: fmt.Errorf("could not update boot group assignments for nodes=%v: %w", nodeList, err)}
 			return nodesUpdated, err
 		}
 
@@ -1867,7 +1871,7 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 		}
 		err = bddb.updateNodeAssignment(nodeIds, bgbc.Bg.Id)
 		if err != nil {
-			err = fmt.Errorf("postgres.Update: Could not update boot group assignments for nodes=%v: %v", nodeList, err)
+			err = ErrPostgresUpdate{Err: fmt.Errorf("could not update boot group assignments for nodes=%v: %w", nodeList, err)}
 			return nodesUpdated, err
 		}
 
@@ -1875,6 +1879,82 @@ func (bddb BootDataDatabase) Update(bp bssTypes.BootParams) (nodesUpdated []stri
 	}
 
 	return nodesUpdated, err
+}
+
+// Set modifies existing boot parameters, kernel, or initramfs URIs and adds any
+// new ones. Unlike Update, any nodes that do not already exist are added. Under
+// the hood, Set determines which nodes do not exist and calls Add to add them
+// with the new boot configuration, then determines which nodes do exist and
+// calls Update to update them with the new boot configuration.
+func (bddb BootDataDatabase) Set(bp bssTypes.BootParams) (err error) {
+	// Make sure the new content isn't blank.
+	lenParams := len(bp.Params)
+	lenKernUri := len(bp.Kernel)
+	lenInitrdUri := len(bp.Initrd)
+	if lenParams == 0 && lenKernUri == 0 && lenInitrdUri == 0 {
+		err = ErrPostgresUpdate{Err: fmt.Errorf("must specify at least one of params, kernel, or initrd")}
+		return err
+	}
+
+	// Create BootParams struct for _new_ nodes that will be added
+	addBp := bssTypes.BootParams{
+		Kernel: bp.Kernel,
+		Initrd: bp.Initrd,
+		Params: bp.Params,
+	}
+	_, addBp.Macs, addBp.Hosts, addBp.Nids, err = bddb.CheckNodeExistence(bp.Macs, bp.Hosts, bp.Nids)
+	if err != nil {
+		err = ErrPostgresUpdate{Err: err}
+		return err
+	}
+
+	// Create BootParams struct for _existing_ nodes that will be updated
+	updateBp := bssTypes.BootParams{
+		Kernel: bp.Kernel,
+		Initrd: bp.Initrd,
+		Params: bp.Params,
+	}
+	existingNodeList, err := bddb.GetNodesByItems(bp.Macs, bp.Hosts, bp.Nids)
+	if err != nil {
+		err = ErrPostgresAdd{Err: err}
+		return err
+	}
+	for _, node := range existingNodeList {
+		if node.BootMac != "" {
+			updateBp.Macs = append(updateBp.Macs, node.BootMac)
+		}
+		if node.Xname != "" {
+			updateBp.Hosts = append(updateBp.Hosts, node.Xname)
+		}
+		if node.Nid != 0 {
+			updateBp.Nids = append(updateBp.Nids, node.Nid)
+		}
+	}
+
+	// Add new nodes, boot config, boot group, and boot group assignments.
+	//
+	// The Add() function will take care of boot config/group deduplication.
+	if len(addBp.Macs) > 0 || len(addBp.Hosts) > 0 || len(addBp.Nids) > 0 {
+		_, err = bddb.Add(addBp)
+		if err != nil {
+			err = ErrPostgresSet{Err: fmt.Errorf("failed to add new boot configuration: %w", err)}
+			return err
+		}
+	}
+
+	// Update existing nodes, boot config, boot group, and boot group
+	// assignments.
+	//
+	// The Update() function will take care of the deletion of dangling
+	// configs.
+	if len(existingNodeList) > 0 {
+		_, err = bddb.Update(updateBp)
+		if err != nil {
+			err = ErrPostgresSet{Err: fmt.Errorf("failed to update existing boot configuration: %w", err)}
+		}
+	}
+
+	return err
 }
 
 // GetBootParamsAll returns a slice of bssTypes.BootParams that contains all of the boot
@@ -1892,7 +1972,7 @@ func (bddb BootDataDatabase) GetBootParamsAll() ([]bssTypes.BootParams, error) {
 		";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("postgres.GetBootParamsAll: Unable to query database: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsAll: unable to query database: %w", err)}
 		return results, err
 	}
 	defer rows.Close()
@@ -1910,7 +1990,7 @@ func (bddb BootDataDatabase) GetBootParamsAll() ([]bssTypes.BootParams, error) {
 		err = rows.Scan(&node.Id, &node.BootMac, &node.Xname, &node.Nid,
 			&bgid, &bc.Id, &bc.KernelUri, &bc.InitrdUri, &bc.Cmdline)
 		if err != nil {
-			err = fmt.Errorf("postgres.GetBootParamsAll: Could not scan SQL result: %v", err)
+			err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsAll: could not scan SQL result: %w", err)}
 			return results, err
 		}
 
@@ -1924,7 +2004,7 @@ func (bddb BootDataDatabase) GetBootParamsAll() ([]bssTypes.BootParams, error) {
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("postgres.GetBootParamsAll: Could not parse query results: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsAll: could not parse query results: %w", err)}
 		return results, err
 	}
 	// If not, we are done parsing the nodes and boot configs. Add to results.
@@ -1971,7 +2051,7 @@ func (bddb BootDataDatabase) GetBootParamsByName(names []string) ([]bssTypes.Boo
 		";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("postgres.GetBootParamsByName: Unable to query database: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByName: unable to query database: %w", err)}
 		return results, err
 	}
 	defer rows.Close()
@@ -1986,7 +2066,7 @@ func (bddb BootDataDatabase) GetBootParamsByName(names []string) ([]bssTypes.Boo
 		)
 		err = rows.Scan(&name, &bp.Kernel, &bp.Initrd, &bp.Params)
 		if err != nil {
-			err = fmt.Errorf("postgres.GetBootParamsByName: Could not scan SQL result: %v", err)
+			err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByName: could not scan SQL result: %w", err)}
 			return results, err
 		}
 		bp.Hosts = append(bp.Hosts, name)
@@ -1995,7 +2075,7 @@ func (bddb BootDataDatabase) GetBootParamsByName(names []string) ([]bssTypes.Boo
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("postgres.GetBootParamsByName: Could not parse query results: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByName: could not parse query results: %w", err)}
 		return results, err
 	}
 
@@ -2029,7 +2109,7 @@ func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootP
 		";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("postgres.GetBootParamsByMac: Unable to query database: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByMac: unable to query database: %w", err)}
 		return results, err
 	}
 	defer rows.Close()
@@ -2044,7 +2124,7 @@ func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootP
 		)
 		err = rows.Scan(&mac, &bp.Kernel, &bp.Initrd, &bp.Params)
 		if err != nil {
-			err = fmt.Errorf("postgres.GetBootParamsByMac: Could not scan SQL result: %v", err)
+			err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByMac: could not scan SQL result: %w", err)}
 			return results, err
 		}
 		bp.Macs = append(bp.Macs, mac)
@@ -2053,7 +2133,7 @@ func (bddb BootDataDatabase) GetBootParamsByMac(macs []string) ([]bssTypes.BootP
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("postgres.GetBootParamsByName: Could not parse query results: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByName: could not parse query results: %w", err)}
 		return results, err
 	}
 
@@ -2081,7 +2161,7 @@ func (bddb BootDataDatabase) GetBootParamsByNid(nids []int32) ([]bssTypes.BootPa
 		";"
 	rows, err := bddb.DB.Query(qstr)
 	if err != nil {
-		err = fmt.Errorf("postgres.GetBootParamsByNid: Unable to query database: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByNid: unable to query database: %w", err)}
 		return results, err
 	}
 	defer rows.Close()
@@ -2096,7 +2176,7 @@ func (bddb BootDataDatabase) GetBootParamsByNid(nids []int32) ([]bssTypes.BootPa
 		)
 		err = rows.Scan(&nid, &bp.Kernel, &bp.Initrd, &bp.Params)
 		if err != nil {
-			err = fmt.Errorf("postgres.GetBootParamsByNid: Could not scan SQL result: %v", err)
+			err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByNid: could not scan SQL result: %w", err)}
 			return results, err
 		}
 		bp.Nids = append(bp.Nids, nid)
@@ -2105,7 +2185,7 @@ func (bddb BootDataDatabase) GetBootParamsByNid(nids []int32) ([]bssTypes.BootPa
 	}
 	// Did a rows.Next() return an error?
 	if err = rows.Err(); err != nil {
-		err = fmt.Errorf("postgres.GetBootParamsByNid: Could not parse query results: %v", err)
+		err = ErrPostgresGet{Err: fmt.Errorf("GetBootParamsByNid: could not parse query results: %w", err)}
 		return results, err
 	}
 
