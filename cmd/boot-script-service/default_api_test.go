@@ -53,14 +53,14 @@ func TestReplaceS3Params_regex(t *testing.T) {
 		" metal.server=s3://b2/p1/p2")
 
 	expected := [][]string{
-		[]string{
+		{
 			"metal.server=s3://b1/p1/p2",
 			"",
 			"metal.server=s3://b1/p1/p2",
 			"metal.server=",
 			"s3://b1/p1/p2",
 		},
-		[]string{
+		{
 			" metal.server=s3://b2/p1/p2",
 			" ",
 			"metal.server=s3://b2/p1/p2",
@@ -89,7 +89,7 @@ func TestReplaceS3Params_regex(t *testing.T) {
 	}
 }
 
-// TestReplaceS3Params_replace_kernel_metal tests that the “metal.server=s3://<url>“ argument is recognized and given a pre-signed URL.
+// TestReplaceS3Params_replace_kernel_metal tests that the "metal.server=s3://<url>" argument is recognized and given a pre-signed URL.
 func TestReplaceS3Params_replace_kernel_metal(t *testing.T) {
 	params := fmt.Sprintf("%s %s %s %s %s",
 		"metal.server=s3://ncn-images/k8s/0.2.78/filesystem.squashfs",
@@ -114,7 +114,7 @@ func TestReplaceS3Params_replace_kernel_metal(t *testing.T) {
 	}
 }
 
-// TestReplaceS3Params_replace_kernel_live tests that the dmsquash-live “root=live:s3://<url>“ argument is recognized and given a pre-signed URL.
+// TestReplaceS3Params_replace_kernel_live tests that the dmsquash-live "root=live:s3://<url>" argument is recognized and given a pre-signed URL.
 func TestReplaceS3Params_replace_kernel_live(t *testing.T) {
 	params := fmt.Sprintf("%s %s %s %s",
 		"root=live:s3://boot-images/k8s/0.2.78/rootfs",

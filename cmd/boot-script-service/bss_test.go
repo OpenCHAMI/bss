@@ -40,11 +40,8 @@ import (
 
 func TestMain(m *testing.M) {
 	// call flag.Parse() here if TestMain uses flags
-
-	var err error
-
 	// Now we make a Kv object to mock up the KV store service.
-	err = kvOpen("mem:", "", 1, 1)
+	err := kvOpen("mem:", "", 1, 1)
 	excode := 1
 	if err != nil {
 		// This should not happen as long as the SM json is correct.
@@ -122,7 +119,7 @@ func TestStoreAndLookup(t *testing.T) {
 		{Initrd: "/test/path/initrd.gz", Params: "def-initrd"},
 	}
 	for _, bp := range tables {
-		err, referralToken := Store(bp)
+		referralToken, err := Store(bp)
 		if err != nil {
 			t.Errorf("Store failed for '%v': %s", bp, err.Error())
 		} else if referralToken == "" && (bp.Hosts != nil || bp.Nids != nil || bp.Macs != nil) {

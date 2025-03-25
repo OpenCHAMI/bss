@@ -41,8 +41,8 @@ type serviceStatus struct {
 }
 
 type storageBackend struct {
-	Name   string `json:"name",omitempty`
-	Status string `json:"status",omitempty`
+	Name   string `json:"name,omitempty"`
+	Status string `json:"status,omitempty"`
 }
 
 func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {
@@ -228,6 +228,9 @@ func serviceStorageResponse(w http.ResponseWriter, req *http.Request) {
 
 func etcdTestStore(testId int) error {
 	data, err := json.Marshal(testId)
+	if err != nil {
+		return fmt.Errorf("failed to marshal test ID: %v", err)
+	}
 	err = kvstore.Store("/bss/etcdTest", string(data))
 	return err
 }
@@ -237,7 +240,7 @@ func etcdTestGet() (testId int, err error) {
 	if exists {
 		err = json.Unmarshal([]byte(data), &testId)
 	} else if err == nil {
-		err = fmt.Errorf("Key /bss/etcdTest does not exist")
+		err = fmt.Errorf("key /bss/etcdTest does not exist")
 	}
 	return testId, err
 }

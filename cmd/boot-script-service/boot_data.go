@@ -59,10 +59,10 @@ const (
 
 type BootDataStore struct {
 	Params        string             `json:"params,omitempty"`
-	Kernel        string             `json:"kernel,omitempty"`        // Image storage key
-	Initrd        string             `json:"initrd,omitempty"`        // Image storage key
-	CloudInit     bssTypes.CloudInit `json:"cloud-init,omitempty"`    // Image storage key
-	ReferralToken string             `json:"referral-token,omitempty` // UUID
+	Kernel        string             `json:"kernel,omitempty"`         // Image storage key
+	Initrd        string             `json:"initrd,omitempty"`         // Image storage key
+	CloudInit     bssTypes.CloudInit `json:"cloud-init,omitempty"`     // Image storage key
+	ReferralToken string             `json:"referral-token,omitempty"` // UUID
 }
 
 type ImageData struct {
@@ -81,7 +81,6 @@ type BootData struct {
 const DefaultTag = "Default"
 const GlobalTag = "Global"
 
-var dataStore map[string]BootDataStore = make(map[string]BootDataStore)
 var imageCache = func() hmetcd.Kvi { s, _ := hmetcd.Open("mem:", ""); return s }()
 
 func makeKey(key, subkey string) string {
@@ -128,7 +127,7 @@ func getImage(imtype, subkey string) (ImageData, error) {
 		val, exists, err = kvstore.Get(key)
 	}
 	if err == nil && !exists {
-		err = fmt.Errorf("Key '%s' does not exist", key)
+		err = fmt.Errorf("key '%s' does not exist", key)
 	}
 	var imdata ImageData
 	if err == nil {
@@ -295,7 +294,7 @@ func removeHost(h string) error {
 	key := paramsPfx + h
 	_, exists, err := kvstore.Get(key)
 	if !exists {
-		err = fmt.Errorf("Key %s does not exist", key)
+		err = fmt.Errorf("key %s does not exist", key)
 	} else if err == nil {
 		err = kvstore.Delete(key)
 	}
@@ -361,17 +360,17 @@ func SqlGetBootParams(macs, xnames []string, nids []int32) (results []bssTypes.B
 	)
 	paramsByMac, err = bssdb.GetBootParamsByMac(macs)
 	if err != nil {
-		err = fmt.Errorf("Error getting boot parameters for macs=%v: %v", macs, err)
+		err = fmt.Errorf("error getting boot parameters for macs=%v: %v", macs, err)
 		return
 	}
 	paramsByName, err = bssdb.GetBootParamsByName(xnames)
 	if err != nil {
-		err = fmt.Errorf("Error getting boot parameters for names=%v: %v", xnames, err)
+		err = fmt.Errorf("error getting boot parameters for names=%v: %v", xnames, err)
 		return
 	}
 	paramsByNid, err = bssdb.GetBootParamsByNid(nids)
 	if err != nil {
-		err = fmt.Errorf("Error getting boot parameters for nids=%v: %v", nids, err)
+		err = fmt.Errorf("error getting boot parameters for nids=%v: %v", nids, err)
 		return
 	}
 
@@ -483,15 +482,15 @@ func SqlGetBootParams(macs, xnames []string, nids []int32) (results []bssTypes.B
 	return
 }
 
-func StoreNew(bp bssTypes.BootParams) (error, string) {
+func StoreNew(bp bssTypes.BootParams) (string, error) {
 	// postgres.Add will handle duplicates.
 	if useSQL {
 		debugf("postgres.Add(%v)\n", bp)
 		if result, err := bssdb.Add(bp); err != nil {
-			return err, ""
+			return "", err
 		} else {
 			debugf("postgres.Add(%v) result: %v\n", bp, result)
-			return err, uuid.New().String()
+			return uuid.New().String(), nil
 		}
 	}
 
@@ -539,21 +538,21 @@ func StoreNew(bp bssTypes.BootParams) (error, string) {
 		}
 	}
 	if item != "" {
-		return fmt.Errorf("Already exists: %s", item), ""
+		return "", fmt.Errorf("already exists: %s", item)
 	} else {
 		return Store(bp)
 	}
 }
 
-func Store(bp bssTypes.BootParams) (error, string) {
+func Store(bp bssTypes.BootParams) (string, error) {
 	debugf("Store(%v)\n", bp)
 
 	if useSQL {
 		debugf("postgres.Set(%v)\n", bp)
 		if err := bssdb.Set(bp); err != nil {
-			return err, ""
+			return "", err
 		} else {
-			return err, uuid.New().String()
+			return uuid.New().String(), nil
 		}
 	}
 
@@ -561,13 +560,13 @@ func Store(bp bssTypes.BootParams) (error, string) {
 	if bp.Kernel != "" {
 		kernel_id = imageStore(bp.Kernel, kernelImageType)
 		if kernel_id == "" {
-			return fmt.Errorf("Cannot store image path %s", bp.Kernel), ""
+			return "", fmt.Errorf("cannot store image path %s", bp.Kernel)
 		}
 	}
 	if bp.Initrd != "" {
 		initrd_id = imageStore(bp.Initrd, initrdImageType)
 		if initrd_id == "" {
-			return fmt.Errorf("Cannot store image path %s", bp.Initrd), ""
+			return "", fmt.Errorf("cannot store image path %s", bp.Initrd)
 		}
 	}
 
@@ -632,7 +631,7 @@ func Store(bp bssTypes.BootParams) (error, string) {
 		referralToken = "" // referralToken was not needed
 	}
 	debugf("Store referralToken: %s\n", referralToken)
-	return err, referralToken
+	return referralToken, err
 }
 
 // The update function will update entries but not NULL out existing entries.
@@ -758,8 +757,8 @@ func updateCloudData(existing *bssTypes.CloudDataType, merge bssTypes.CloudDataT
 		}
 	}()
 
-	if merge != nil && len(merge) != 0 {
-		if *existing == nil || len(*existing) == 0 {
+	if len(merge) != 0 {
+		if len(*existing) == 0 {
 			*existing = merge
 			changed = merge != nil
 		} else {
@@ -847,10 +846,7 @@ func getAccessesForPrefix(prefix string) (accesses []bssTypes.EndpointAccess, er
 		endpoint := endpointParts[len(endpointParts)-1]
 		name := endpointParts[len(endpointParts)-2]
 
-		lastEpoch, err := strconv.ParseInt(kv.Value, 0, 64)
-		if err != nil {
-			err = fmt.Errorf("failed to convert timestamp to int: %w", err)
-		}
+		lastEpoch, _ := strconv.ParseInt(kv.Value, 0, 64)
 
 		newAccess := bssTypes.EndpointAccess{
 			Name:      name,
@@ -968,7 +964,7 @@ func lookupHost(name string) (BootDataStore, error) {
 	val, exists, err := kvstore.Get(key)
 	var bds BootDataStore
 	if !exists && err == nil {
-		err = fmt.Errorf("Key %s does not exist", key)
+		err = fmt.Errorf("key %s does not exist", key)
 	}
 	if err == nil {
 		err = json.Unmarshal([]byte(val), &bds)
@@ -1113,7 +1109,7 @@ func LookupByName(name string) (BootData, SMComponent) {
 		var result BootData
 		bps, err := bssdb.GetBootParamsByName([]string{name})
 		if err != nil {
-			err = fmt.Errorf("Could not retrieve boot parameters with name %q: %v", name, err)
+			err = fmt.Errorf("could not retrieve boot parameters with name %q: %v", name, err)
 			log.Printf("ERROR: %v", err)
 			return result, comp
 		}
@@ -1145,7 +1141,7 @@ func LookupByMAC(mac string) (BootData, SMComponent) {
 		var result BootData
 		bps, err := bssdb.GetBootParamsByMac([]string{mac})
 		if err != nil {
-			err = fmt.Errorf("Could not retrieve boot parameters with mac %q: %v", mac, err)
+			err = fmt.Errorf("could not retrieve boot parameters with mac %q: %v", mac, err)
 			log.Printf("ERROR: %v", err)
 			return result, comp
 		}
@@ -1178,7 +1174,7 @@ func LookupByNid(nid int) (BootData, SMComponent) {
 		var result BootData
 		bps, err := bssdb.GetBootParamsByNid([]int32{int32(nid)})
 		if err != nil {
-			err = fmt.Errorf("Could not retrieve boot parameters with NID %d: %v", nid, err)
+			err = fmt.Errorf("could not retrieve boot parameters with NID %d: %v", nid, err)
 			log.Printf("ERROR: %v", err)
 			return result, comp
 		}
@@ -1196,13 +1192,4 @@ func LookupByNid(nid int) (BootData, SMComponent) {
 		return result, comp
 	}
 	return lookup(comp_name, nid_str, role, DefaultTag), comp
-}
-
-func dumpDataStore() {
-	kvl, err := kvstore.GetRange(keyMin, keyMax)
-	if err == nil {
-		for _, x := range kvl {
-			fmt.Printf("%s: %s\n", x.Key, x.Value)
-		}
-	}
 }

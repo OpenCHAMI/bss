@@ -37,7 +37,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -105,7 +105,7 @@ func getJoinToken(xname, role, subRole string) (string, error) {
 	if rsp.StatusCode != http.StatusOK && rsp.StatusCode != http.StatusCreated && rsp.StatusCode != http.StatusAccepted {
 		log.Printf("ERROR: %s: spire token service response for %s: %s", url, xname, rsp.Status)
 	}
-	rspBody, err := ioutil.ReadAll(rsp.Body)
+	rspBody, err := io.ReadAll(rsp.Body)
 	if err != nil {
 		log.Printf("ERROR: %s: reading response from spire token service: %s", url, err)
 		return "", err

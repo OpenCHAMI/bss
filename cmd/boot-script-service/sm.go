@@ -100,20 +100,19 @@ func TestSMAuthEnabled(retryCount, retryInterval uint64) (authEnabled bool, err 
 	// auth is enabled.
 	testURL, err = url.JoinPath(smBaseURL, hsmTestEP)
 	if err != nil {
-		err = fmt.Errorf("Could not join URL paths %q and %q: %v", smBaseURL, hsmTestEP, err)
+		err = fmt.Errorf("could not join URL paths %q and %q: %v", smBaseURL, hsmTestEP, err)
 		return
 	}
 
 	retryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", retryInterval))
 	if err != nil {
-		err = fmt.Errorf("Invalid retry interval: %v", err)
+		err = fmt.Errorf("invalid retry interval: %v", err)
 		return
 	}
 	for retry := uint64(0); retry < retryCount; retry++ {
 		log.Printf("Attempting connection to %s (attempt %d/%d)", testURL, retry+1, retryCount)
 		resp, err = smClient.Get(testURL)
 		if err != nil {
-			err = fmt.Errorf("Could not GET %q: %v", testURL, err)
 			time.Sleep(retryDuration)
 			continue
 		}
@@ -127,7 +126,7 @@ func TestSMAuthEnabled(retryCount, retryInterval uint64) (authEnabled bool, err 
 		return
 	}
 
-	err = fmt.Errorf("Number of retries (%d) exhausted when testing if SMD auth is enabled", retryCount)
+	err = fmt.Errorf("number of retries (%d) exhausted when testing if SMD auth is enabled", retryCount)
 	return
 }
 
@@ -138,7 +137,7 @@ func TestSMProtectedAccess() error {
 	)
 
 	if accessToken == "" {
-		return fmt.Errorf("Access token is empty")
+		return fmt.Errorf("access token is empty")
 	}
 	if smClient == nil {
 		return fmt.Errorf("smClient nil. Has a connection been opened yet?")
@@ -146,18 +145,18 @@ func TestSMProtectedAccess() error {
 
 	testURL, err := url.JoinPath(smBaseURL, hsmTestEP)
 	if err != nil {
-		err = fmt.Errorf("Could not join URL paths %q and %q: %v", smBaseURL, hsmTestEP, err)
+		err = fmt.Errorf("could not join URL paths %q and %q: %v", smBaseURL, hsmTestEP, err)
 		return err
 	}
 
-	req, err = http.NewRequest(http.MethodGet, testURL, nil)
+	req, _ = http.NewRequest(http.MethodGet, testURL, nil)
 	headers := map[string][]string{
 		"Authorization": {"Bearer " + accessToken},
 	}
 	req.Header = headers
 	res, err = smClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("Could not execute request: %v", err)
+		return fmt.Errorf("could not execute request: %v", err)
 	}
 	defer res.Body.Close()
 
@@ -167,7 +166,7 @@ func TestSMProtectedAccess() error {
 func SmOpen(base, options string) error {
 	u, err := url.Parse(base)
 	if err != nil {
-		return fmt.Errorf("Unknown HSM URL: %s", base)
+		return fmt.Errorf("unknown HSM URL: %s", base)
 	}
 	if u.Scheme == "mem" {
 		// The mem: interface to the state manager is strictly for testing
@@ -222,13 +221,13 @@ func SmOpen(base, options string) error {
 	var smAuthEnabled bool
 	smAuthEnabled, err = TestSMAuthEnabled(authRetryCount, authRetryWait)
 	if err != nil {
-		return fmt.Errorf("Failed testing if HSM auth is enabled: %v", err)
+		return fmt.Errorf("failed testing if HSM auth is enabled: %v", err)
 	}
 	if smAuthEnabled {
 		log.Printf("HSM authenticated endpoints enabled, checking token")
 		err = smClient.JWTTestAndRefresh()
 		if err != nil {
-			return fmt.Errorf("Failed refreshing JWT: %v", err)
+			return fmt.Errorf("failed refreshing JWT: %v", err)
 		}
 	}
 	return nil
@@ -369,15 +368,14 @@ func getStateFromHSM() *SMData {
 		type myCompEndpt struct {
 			ID           string `json:"ID"`
 			Enabled      *bool  `json:"Enabled"`
-			RfEndpointID string `json: "RedfishEndpointID"`
+			RfEndpointID string `json:"RedfishEndpointID"`
 		}
 		type myCompEndptArray struct {
 			CompEndpts []*myCompEndpt `json:"ComponentEndpoints"`
 		}
 		var mep myCompEndptArray
-		if err == nil {
-			err = json.Unmarshal(ce, &mep)
-		}
+
+		json.Unmarshal(ce, &mep)
 
 		// We use a map rather than a list.  The values in the map don't matter,
 		// just the keys.  This way duplicates get filtered out.  We will most
@@ -454,7 +452,7 @@ func getStateFromHSM() *SMData {
 			}
 
 			// Also see if this EthernetInterface belongs to any Components.
-			for index, _ := range comps.Components {
+			for index := range comps.Components {
 				component := comps.Components[index]
 
 				if component.ID == e.CompID {

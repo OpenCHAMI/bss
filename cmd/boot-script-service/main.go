@@ -130,12 +130,12 @@ func parseEnv(evar string, v interface{}) (ret error) {
 			case "1", "on", "yes", "true":
 				*vp = true
 			default:
-				ret = fmt.Errorf("Unrecognized bool value: '%s'", val)
+				ret = fmt.Errorf("unrecognized bool value: '%s'", val)
 			}
 		case *[]string:
 			*vp = strings.Split(val, ",")
 		default:
-			ret = fmt.Errorf("Invalid type for receiving ENV variable value %T", v)
+			ret = fmt.Errorf("invalid type for receiving ENV variable value %T", v)
 		}
 	}
 	return
@@ -155,31 +155,6 @@ func kvDefaultURL() string {
 	return ret
 }
 
-func kvDefaultRetryConfig() (retryCount uint64, retryWait uint64, err error) {
-	retryCount = kvDefaultRetryCount
-	retryWait = kvDefaultRetryWait
-
-	envRetryCount := os.Getenv("ETCD_RETRY_COUNT")
-	if envRetryCount != "" {
-		retryCount, err = strconv.ParseUint(envRetryCount, 10, 64)
-		if err != nil {
-			log.Println("ERROR enable to parse ETCD_RETRY_COUNT environment variable: ", err)
-			return kvDefaultRetryCount, kvDefaultRetryWait, err
-		}
-	}
-
-	envRetryWait := os.Getenv("ETCD_RETRY_WAIT")
-	if envRetryWait != "" {
-		retryWait, err = strconv.ParseUint(envRetryWait, 10, 64)
-		if err != nil {
-			log.Println("ERROR enable to parse ETCD_RETRY_WAIT environment variable: ", err)
-			return kvDefaultRetryCount, kvDefaultRetryWait, err
-		}
-	}
-
-	return retryCount, retryWait, nil
-}
-
 func kvOpen(url, opts string, retryCount, retryWait uint64) (err error) {
 	ix := uint64(1)
 	for ; ix <= retryCount; ix++ {
@@ -194,7 +169,7 @@ func kvOpen(url, opts string, retryCount, retryWait uint64) (err error) {
 		time.Sleep(time.Duration(retryWait) * time.Second)
 	}
 	if ix > retryCount {
-		err = fmt.Errorf("ETCD connection attempts exhausted (%d).", retryCount)
+		err = fmt.Errorf("ETCD connection attempts exhausted (%d)", retryCount)
 	} else {
 		log.Printf("KV service initialized connecting to %s", url)
 	}
@@ -220,7 +195,7 @@ func sqlOpen(host string, port uint, user, password, extraDbOpts string, ssl boo
 		time.Sleep(time.Duration(retryWait) * time.Second)
 	}
 	if ix > retryCount {
-		err = fmt.Errorf("Postgres connection attempts exhausted (%d).", retryCount)
+		err = fmt.Errorf("postgres connection attempts exhausted (%d)", retryCount)
 	} else {
 		log.Printf("Initialized connection to Postgres database at %s:%d", host, port)
 	}

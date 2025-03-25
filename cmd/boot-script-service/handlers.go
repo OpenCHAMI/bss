@@ -149,7 +149,7 @@ func BootparametersPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store parameters
-	err, token := StoreNew(req.params)
+	token, err := StoreNew(req.params)
 	if err != nil {
 		LogBootParameters("/bootparameters POST FAILED: %s", req.params)
 		sendErrorResponse(w, http.StatusBadRequest, "Failed to store boot parameters: %v", err)
@@ -179,7 +179,7 @@ func BootparametersPut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store parameters
-	err, token := Store(req.params)
+	token, err := Store(req.params)
 	if err != nil {
 		LogBootParameters("/bootparameters PUT FAILED: %s", req.params)
 		if herr, ok := base.GetHMSError(err); ok && herr.GetProblem() != nil {

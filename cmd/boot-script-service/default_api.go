@@ -109,7 +109,7 @@ func replaceS3Params(params string, getSignedS3Url signedS3UrlGetter) (newParams
 	// 4: value (s3 uri)               example: 's3://bucket/path'
 	r, err := regexp.Compile(s3ParamsRegex)
 	if err != nil {
-		err = fmt.Errorf("Failed to replace s3 URIs in the params because the regex failed to compile: %s, error: %v", s3ParamsRegex, err)
+		err = fmt.Errorf("failed to replace s3 URIs in the params because the regex failed to compile: %s, error: %v", s3ParamsRegex, err)
 		return params, err
 	}
 
@@ -125,7 +125,7 @@ func replaceS3Params(params string, getSignedS3Url signedS3UrlGetter) (newParams
 			newParam := m[1] + m[3] + httpS3SignedUrl
 			newParams = strings.Replace(newParams, oldParam, newParam, 1)
 		} else {
-			err = fmt.Errorf("The matched pattern contained fewer groups than expected. has: %d, expected: %d, matches: %v", len(m), 5, m)
+			err = fmt.Errorf("the matched pattern contained fewer groups than expected. has: %d, expected: %d, matches: %v", len(m), 5, m)
 			return params, err
 		}
 	}
@@ -140,9 +140,6 @@ func checkURL(u string) (string, error) {
 	// This is an S3 "url".  The way we are using them are that the "host" part
 	// of the URL is the bucket, and the rest is the key.  If the "host" is
 	// nil, then we will use the first part of the path as the bucket.
-	if err != nil {
-		return "", err
-	}
 	bucket := ""
 	key := ""
 	if p.Host == "" {
@@ -163,7 +160,7 @@ func checkURL(u string) (string, error) {
 		if err != nil {
 			log.Printf("Failed to load S3 connection info: %s", err)
 		}
-		s3Client, err = hms_s3.NewS3Client(info, httpClient)
+		s3Client, _ = hms_s3.NewS3Client(info, httpClient)
 	} else {
 		s3Client.SetBucket(bucket)
 	}
@@ -228,7 +225,7 @@ func paramSubstitute(params, pvar string, getVal paramValRetreiver) (string, err
 		pvar = "${" + pvar + "}"
 	}
 	var err error
-	if strings.Index(params, pvar) >= 0 {
+	if strings.Contains(params, pvar) {
 		// The variable exists, so we need to do the substitution.
 		var val string
 		val, err = getVal()
@@ -249,7 +246,7 @@ func paramSubstitute(params, pvar string, getVal paramValRetreiver) (string, err
 func buildBootScript(bd BootData, sp scriptParams, chain, role, subRole, descr string) (string, error) {
 	debugf("buildBootScript(%v, %v, %v, %v, %v, %v)\n", bd, sp, chain, role, subRole, descr)
 	if bd.Kernel.Path == "" {
-		return "", fmt.Errorf("%s: this host not configured for booting.", descr)
+		return "", fmt.Errorf("%s: this host not configured for booting", descr)
 	}
 
 	params := bd.Params
@@ -386,7 +383,7 @@ func blacklist(comp SMComponent) (err error) {
 		// if it has a configuration specifically for itself.  If so, we
 		// will still serve it.
 		if checkHost(comp.ID) != nil && (comp.Role == "" || checkHost(comp.Role) != nil) {
-			err = fmt.Errorf("Node %s blocked, role: %s", comp.ID, comp.Role)
+			err = fmt.Errorf("node %s blocked, role: %s", comp.ID, comp.Role)
 		}
 	}
 	return
@@ -617,7 +614,7 @@ func DumpstateGet(w http.ResponseWriter, r *http.Request) {
 		results.Params, err = bssdb.GetBootParamsAll()
 		if err != nil {
 			log.Printf("DumpStateGet(): GetBootParamsAll(): Could not get boot parameters from SQL DB: %v", err)
-			err = fmt.Errorf("Error retrieving boot parameters from database")
+			err = fmt.Errorf("error retrieving boot parameters from database")
 		}
 	} else {
 		for _, image := range GetKernelInfo() {
@@ -659,12 +656,12 @@ func DumpstateGet(w http.ResponseWriter, r *http.Request) {
 			debugf("Retrieved params: %v", results.Params)
 		} else {
 			log.Printf("DumpStateGet(): getTags(): %v", err)
-			err = fmt.Errorf("Error retrieving names from key-value store")
+			err = fmt.Errorf("error retrieving names from key-value store")
 		}
 	}
 	if err != nil {
 		base.SendProblemDetailsGeneric(w, http.StatusInternalServerError,
-			fmt.Sprintf("Retrieving state failed: %v", err))
+			fmt.Sprintf("retrieving state failed: %v", err))
 	} else {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		w.WriteHeader(http.StatusOK)

@@ -26,10 +26,10 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"strings"
 
@@ -95,7 +95,7 @@ func generateMetaData(xname string, metadata map[string]interface{}) error {
 
 	comp, found := FindSMCompByName(xname)
 	if !found {
-		return fmt.Errorf("Could not find Component for %s", xname)
+		return fmt.Errorf("could not find Component for %s", xname)
 	}
 
 	if metadata["local-hostname"] == nil {
@@ -198,7 +198,7 @@ func metaDataGetAPI(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			debugf("CloudInit MetaData: Query Not Found: %v\n", err)
 			base.SendProblemDetailsGeneric(w, http.StatusNotFound,
-				fmt.Sprintf("Not Found"))
+				"Not Found")
 			return
 		}
 		json.NewEncoder(w).Encode(rval)
@@ -208,8 +208,6 @@ func metaDataGetAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(httpStatus)
-	return
-
 }
 
 func userDataGetAPI(w http.ResponseWriter, r *http.Request) {
@@ -276,8 +274,6 @@ func userDataGetAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Record the fact this was asked for.
 	updateEndpointAccessed(xname, bssTypes.EndpointTypeUserData)
-
-	return
 }
 
 func endpointHistoryGetAPI(w http.ResponseWriter, r *http.Request) {
@@ -332,7 +328,7 @@ func phoneHomePostAPI(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		debugf("CloudInit PhoneHome: Bad Request: %v\n", err)
 		base.SendProblemDetailsGeneric(w, http.StatusBadRequest,
-			fmt.Sprintf("Bad Request"))
+			"Bad Request")
 		return
 	}
 
@@ -342,7 +338,7 @@ func phoneHomePostAPI(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		debugf("CloudInit -> Phone Home called for unknown xname, ip: %s", remoteaddr)
 		base.SendProblemDetailsGeneric(w, http.StatusNotFound,
-			fmt.Sprintf("XName not found for IP"))
+			"XName not found for IP")
 		return
 	}
 	hosts = append(hosts, xname)

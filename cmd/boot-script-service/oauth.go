@@ -169,7 +169,7 @@ func QuoteArrayStrings(arr []string) []string {
 func (client *OAuthClient) PollClientCreds(retryCount, retryInterval uint64) error {
 	retryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", retryInterval))
 	if err != nil {
-		return fmt.Errorf("Invalid retry interval: %v", err)
+		return fmt.Errorf("invalid retry interval: %v", err)
 	}
 	for i := uint64(0); i < retryCount; i++ {
 		log.Printf("Attempting to obtain access token (attempt %d/%d)", i+1, retryCount)
@@ -184,7 +184,7 @@ func (client *OAuthClient) PollClientCreds(retryCount, retryInterval uint64) err
 		return nil
 	}
 	log.Printf("Exhausted attempts to obtain client credentials and token")
-	return fmt.Errorf("Exhausted %d attempts at obtaining client credentials and token", retryCount)
+	return fmt.Errorf("exhausted %d attempts at obtaining client credentials and token", retryCount)
 }
 
 // JWTTestAndRefresh tests the current JWT. If either a parsing error occurs
@@ -215,7 +215,7 @@ func (client *OAuthClient) JWTTestAndRefresh() (err error) {
 	err = client.PollClientCreds(authRetryCount, authRetryWait)
 	if err != nil {
 		log.Printf("Polling for OAuth2 client credentials failed")
-		return fmt.Errorf("Failed to get access token: %v", err)
+		return fmt.Errorf("failed to get access token: %v", err)
 	}
 	log.Printf("Successfully fetched new JWT")
 	return nil
