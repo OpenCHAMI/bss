@@ -94,7 +94,6 @@ var (
 	hsmRetrievalDelay   = uint(10)
 	sqlRetryCount       = sqlDefaultRetryCount
 	sqlRetryWait        = sqlDefaultRetryWait
-	notifier            *ScnNotifier
 	useSQL              = false // Use ETCD by default
 	authRetryCount      = authDefaultRetryCount
 	authRetryWait       = authDefaultRetryWait
@@ -461,8 +460,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Access to SM service %s failed: %v\n", hsmBase, err)
 	}
-
-	notifier = newNotifier(serviceName, nfdBase+"/hmi/v1/subscribe", getNotifierURL(), svcOpts)
 
 	// If --postgres passed, use Postgres. Otherwise, use Etcd.
 	if useSQL {

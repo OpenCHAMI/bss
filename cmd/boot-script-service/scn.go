@@ -27,20 +27,12 @@
 package main
 
 import (
-	"bytes"
-	"crypto/tls"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
-	"os"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
-
-	base "github.com/Cray-HPE/hms-base"
 )
 
 const (
@@ -79,110 +71,9 @@ type ScnSubscribe struct {
 	SubRoles       []string `json:"SubRoles,omitempty"`
 }
 
-func newNotifier(name, subscriberURL, notifierURL, opts string) *ScnNotifier {
-	insecure := false
-	for _, opt := range strings.Split(opts, ",") {
-		if strings.EqualFold(opt, "insecure") {
-			insecure = true
-			break
-		}
-	}
-	ret := &ScnNotifier{
-		SubscriberName: name,
-		SubscriberURL:  subscriberURL,
-		NotifierURL:    notifierURL,
-		Client:         &http.Client{},
-	}
-	if subscriberURL[0:6] == "https:" && insecure {
-		tcfg := &tls.Config{InsecureSkipVerify: true}
-		ret.Client.Transport = &http.Transport{TLSClientConfig: tcfg}
-	}
-	return ret
-}
-
-func customHeaders(req *http.Request) {
-	hdrs := os.Getenv("HMS_CUSTOM_HDRS")
-	if hdrs != "" {
-		for _, line := range strings.Split(hdrs, "\n") {
-			n := strings.Index(line, ":")
-			if n > 0 {
-				t := strings.Trim(line[:n], " \t\r\n:")
-				v := strings.Trim(line[n:], " \t\r\n:")
-				req.Header.Set(t, v)
-			}
-		}
-	}
-}
-
-func (notifier *ScnNotifier) subscribe(comps []string) error {
-	n := len(comps)
-	if n == 0 {
-		return fmt.Errorf("empty component subscription list")
-	}
-	debugf("New notifier subscription, current: %v, incoming: %v", notifier.Components, comps)
-	sort.Strings(comps)
-	if n == len(notifier.Components) {
-		i := 0
-		for i < n && comps[i] == notifier.Components[i] {
-			i++
-		}
-		if i == n {
-			// We are subscribing to the same elements as previously, so we
-			// don't need to change the subscription.
-			return nil
-		}
-	}
-
-	enabled := true
-	sub := ScnSubscribe{
-		Subscriber: notifier.SubscriberName + "@x0",
-		Components: comps,
-		States:     []string{"on", "off", "empty", "unknown", "populated"},
-		Enabled:    &enabled,
-		Url:        notifier.NotifierURL,
-	}
-	debugf("Subscribing for comps: %v", comps)
-	payload, err := json.Marshal(sub)
-	if err != nil {
-		log.Printf("ERROR: marshalling failed: %s", err)
-		return err
-	}
-	var ret error
-	for _, method := range []string{"POST", "PATCH"} {
-		ret = nil
-		req, _ := http.NewRequest(method, notifier.SubscriberURL, bytes.NewBuffer(payload))
-		customHeaders(req)
-		req.Header.Set("Content-Type", "application/json")
-		base.SetHTTPUserAgent(req, serviceName)
-		req.Close = true
-		debugf("Ready to %s to %s: %s, Request: %+v", method, notifier.SubscriberURL, payload, req)
-		rsp, err := notifier.Client.Do(req)
-		if err != nil {
-			log.Printf("ERROR sending %s to hmnfd %s: %s", method, notifier.SubscriberURL, err)
-			return err
-		}
-		rspBody, err := ioutil.ReadAll(rsp.Body)
-		rsp.Body.Close()
-
-		switch rsp.StatusCode {
-		case http.StatusOK, http.StatusNoContent, http.StatusAccepted:
-			log.Printf("%s'd subscriptions for node changes.", method)
-			notifier.Components = make([]string, n)
-			copy(notifier.Components, comps)
-			return nil
-		default:
-			ret = fmt.Errorf("ERROR reponse from hmnfd, status: %s, Error code: %d, Rsp: %s", rsp.Status, rsp.StatusCode, rspBody)
-		}
-	}
-	if ret != nil {
-		log.Println(ret)
-	}
-	return ret
-}
-
 // This function is called when hmnfd POSTs something to our notification URL
 func stateChangeNotification(w http.ResponseWriter, r *http.Request) {
-	p, err := ioutil.ReadAll(r.Body)
+	p, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("ERROR reading body of POST from hmnfd")
 		return

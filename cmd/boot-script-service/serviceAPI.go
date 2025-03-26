@@ -26,10 +26,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -136,9 +136,9 @@ func serviceVersionResponse(w http.ResponseWriter, req *http.Request) {
 	var bssStatus serviceStatus
 	var httpStatus = http.StatusOK
 
-	dat, err := ioutil.ReadFile(".version")
+	dat, err := os.ReadFile(".version")
 	if err != nil {
-		dat, err = ioutil.ReadFile("../../.version")
+		dat, err = os.ReadFile("../../.version")
 		if err != nil {
 			httpStatus = http.StatusInternalServerError
 			dat = []byte("error")
@@ -164,7 +164,7 @@ func serviceHSMResponse(w http.ResponseWriter, req *http.Request) {
 		bssStatus.HSMStatus = "error"
 		log.Printf("Cannot connect to HSM: %v", err)
 	} else {
-		_, err = ioutil.ReadAll(rsp.Body)
+		_, err = io.ReadAll(rsp.Body)
 		if err != nil {
 			httpStatus = http.StatusInternalServerError
 			bssStatus.HSMStatus = "error"
