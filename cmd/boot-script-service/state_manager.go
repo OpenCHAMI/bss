@@ -15,6 +15,14 @@ import (
 	"github.com/OpenCHAMI/smd/v2/pkg/sm"
 )
 
+// Group represents a group of components in the system
+type Group struct {
+	GroupName    string   `json:"GroupName"`
+	GroupType    string   `json:"GroupType"`
+	GroupTags    []string `json:"GroupTags"`
+	GroupMembers []string `json:"GroupMembers"`
+}
+
 // StateManager defines the interface for accessing state manager data
 type StateManager interface {
 	// GetState retrieves the current state of components
@@ -28,6 +36,12 @@ type StateManager interface {
 
 	// GetComponentByNID retrieves a component by its NID
 	GetComponentByNID(nid int) (SMComponent, bool)
+
+	// GetGroupsByMAC returns all groups that contain a component with the given MAC address
+	GetGroupsByMAC(mac string) ([]Group, bool)
+
+	// GetGroupsByName returns all groups that contain a component with the given name
+	GetGroupsByName(name string) ([]Group, bool)
 
 	// RefreshState forces a refresh of the state data
 	RefreshState() error
@@ -45,25 +59,32 @@ type SMComponent struct {
 type SMData struct {
 	Components []SMComponent                    `json:"Components"`
 	IPAddrs    map[string]sm.CompEthInterfaceV2 `json:"IPAddresses"`
+	Groups     []Group                          `json:"Groups"`
 }
 
 // HSMStateManager implements StateManager interface for Hardware State Manager
 type HSMStateManager struct {
-	client    *OAuthClient
-	baseURL   string
-	mutex     sync.Mutex
-	state     *SMData
-	stateMap  map[string]SMComponent
-	timestamp int64
+	client       *OAuthClient
+	baseURL      string
+	mutex        sync.RWMutex
+	state        *SMData
+	stateMap     map[string]SMComponent
+	groupsMap    map[string][]Group // Maps component ID to its groups
+	groupsByName map[string][]Group // Maps component name to its groups
+	groupsByMAC  map[string][]Group // Maps MAC address to its groups
+	timestamp    int64
 }
 
 // FileStateManager implements StateManager interface for local file storage
 type FileStateManager struct {
-	filePath  string
-	mutex     sync.Mutex
-	state     *SMData
-	stateMap  map[string]SMComponent
-	timestamp int64
+	filePath     string
+	mutex        sync.RWMutex
+	state        *SMData
+	stateMap     map[string]SMComponent
+	groupsMap    map[string][]Group // Maps component ID to its groups
+	groupsByName map[string][]Group // Maps component name to its groups
+	groupsByMAC  map[string][]Group // Maps MAC address to its groups
+	timestamp    int64
 }
 
 // NewHSMStateManager creates a new HSM state manager instance
@@ -251,6 +272,59 @@ func (h *HSMStateManager) fetchEthernetInterfaces(smData *SMData) error {
 	return nil
 }
 
+// fetchGroups retrieves and processes group data
+func (h *HSMStateManager) fetchGroups(smData *SMData) error {
+	resp, err := h.makeRequest("/groups?type=Node")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var groups []Group
+	if err := json.NewDecoder(resp.Body).Decode(&groups); err != nil {
+		return fmt.Errorf("failed to decode groups: %v", err)
+	}
+
+	smData.Groups = groups
+
+	// Create lookup maps for efficient group access
+	h.groupsMap = make(map[string][]Group)
+	h.groupsByName = make(map[string][]Group)
+	h.groupsByMAC = make(map[string][]Group)
+
+	// Create component name to ID map for faster lookups
+	compNameToID := make(map[string]string)
+	for _, comp := range smData.Components {
+		compNameToID[comp.ID] = comp.ID
+	}
+
+	// Process each group
+	for _, group := range groups {
+		for _, memberID := range group.GroupMembers {
+			// Add to groupsMap (by component ID)
+			h.groupsMap[memberID] = append(h.groupsMap[memberID], group)
+
+			// Find component by ID to get name and MAC
+			for _, comp := range smData.Components {
+				if comp.ID == memberID {
+					// Add to groupsByName
+					h.groupsByName[comp.ID] = append(h.groupsByName[comp.ID], group)
+
+					// Add to groupsByMAC for each MAC address
+					for _, mac := range comp.Mac {
+						if mac != "" && mac != "not available" && mac != "ff:ff:ff:ff:ff:ff" {
+							h.groupsByMAC[mac] = append(h.groupsByMAC[mac], group)
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (h *HSMStateManager) RefreshState() error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
@@ -269,6 +343,10 @@ func (h *HSMStateManager) RefreshState() error {
 		return fmt.Errorf("failed to fetch ethernet interfaces: %v", err)
 	}
 
+	if err := h.fetchGroups(smData); err != nil {
+		return fmt.Errorf("failed to fetch groups: %v", err)
+	}
+
 	// Update state
 	h.state = smData
 	h.stateMap = make(map[string]SMComponent)
@@ -282,8 +360,8 @@ func (h *HSMStateManager) RefreshState() error {
 
 // HSMStateManager implementation
 func (h *HSMStateManager) GetState() (*SMData, error) {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
 
 	if h.state == nil {
 		if err := h.RefreshState(); err != nil {
@@ -294,8 +372,8 @@ func (h *HSMStateManager) GetState() (*SMData, error) {
 }
 
 func (h *HSMStateManager) GetComponentByName(name string) (SMComponent, bool) {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
 
 	if h.state == nil {
 		if err := h.RefreshState(); err != nil {
@@ -307,8 +385,8 @@ func (h *HSMStateManager) GetComponentByName(name string) (SMComponent, bool) {
 }
 
 func (h *HSMStateManager) GetComponentByMAC(mac string) (SMComponent, bool) {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
 
 	if h.state == nil {
 		if err := h.RefreshState(); err != nil {
@@ -329,8 +407,8 @@ func (h *HSMStateManager) GetComponentByMAC(mac string) (SMComponent, bool) {
 }
 
 func (h *HSMStateManager) GetComponentByNID(nid int) (SMComponent, bool) {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
 
 	if h.state == nil {
 		if err := h.RefreshState(); err != nil {
@@ -346,10 +424,30 @@ func (h *HSMStateManager) GetComponentByNID(nid int) (SMComponent, bool) {
 	return SMComponent{}, false
 }
 
+func (h *HSMStateManager) GetGroupsByMAC(mac string) ([]Group, bool) {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+	if h.groupsByMAC == nil {
+		return nil, false
+	}
+	groups, ok := h.groupsByMAC[mac]
+	return groups, ok
+}
+
+func (h *HSMStateManager) GetGroupsByName(name string) ([]Group, bool) {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+	if h.groupsByName == nil {
+		return nil, false
+	}
+	groups, ok := h.groupsByName[name]
+	return groups, ok
+}
+
 // FileStateManager implementation
 func (f *FileStateManager) GetState() (*SMData, error) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
 
 	if f.state == nil {
 		if err := f.RefreshState(); err != nil {
@@ -360,8 +458,8 @@ func (f *FileStateManager) GetState() (*SMData, error) {
 }
 
 func (f *FileStateManager) GetComponentByName(name string) (SMComponent, bool) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
 
 	if f.state == nil {
 		if err := f.RefreshState(); err != nil {
@@ -373,8 +471,8 @@ func (f *FileStateManager) GetComponentByName(name string) (SMComponent, bool) {
 }
 
 func (f *FileStateManager) GetComponentByMAC(mac string) (SMComponent, bool) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
 
 	if f.state == nil {
 		if err := f.RefreshState(); err != nil {
@@ -395,8 +493,8 @@ func (f *FileStateManager) GetComponentByMAC(mac string) (SMComponent, bool) {
 }
 
 func (f *FileStateManager) GetComponentByNID(nid int) (SMComponent, bool) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
 
 	if f.state == nil {
 		if err := f.RefreshState(); err != nil {
@@ -412,27 +510,77 @@ func (f *FileStateManager) GetComponentByNID(nid int) (SMComponent, bool) {
 	return SMComponent{}, false
 }
 
+func (f *FileStateManager) GetGroupsByMAC(mac string) ([]Group, bool) {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+	if f.groupsByMAC == nil {
+		return nil, false
+	}
+	groups, ok := f.groupsByMAC[mac]
+	return groups, ok
+}
+
+func (f *FileStateManager) GetGroupsByName(name string) ([]Group, bool) {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+	if f.groupsByName == nil {
+		return nil, false
+	}
+	groups, ok := f.groupsByName[name]
+	return groups, ok
+}
+
 func (f *FileStateManager) RefreshState() error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	file, err := os.Open(f.filePath)
+	// Read from file
+	data, err := os.ReadFile(f.filePath)
 	if err != nil {
-		return fmt.Errorf("failed to open state file: %v", err)
+		return fmt.Errorf("failed to read state file: %v", err)
 	}
-	defer file.Close()
 
 	var smData SMData
-	if err := json.NewDecoder(file).Decode(&smData); err != nil {
-		return fmt.Errorf("failed to decode state file: %v", err)
+	if err := json.Unmarshal(data, &smData); err != nil {
+		return fmt.Errorf("failed to unmarshal state data: %v", err)
 	}
 
-	f.state = &smData
+	// Create lookup maps
 	f.stateMap = make(map[string]SMComponent)
+	f.groupsMap = make(map[string][]Group)
+	f.groupsByName = make(map[string][]Group)
+	f.groupsByMAC = make(map[string][]Group)
+
+	// Build component map
 	for _, comp := range smData.Components {
 		f.stateMap[comp.ID] = comp
 	}
-	f.timestamp = time.Now().Unix()
 
+	// Build group maps
+	for _, group := range smData.Groups {
+		for _, memberID := range group.GroupMembers {
+			// Add to groupsMap
+			f.groupsMap[memberID] = append(f.groupsMap[memberID], group)
+
+			// Find component by ID to get name and MAC
+			for _, comp := range smData.Components {
+				if comp.ID == memberID {
+					// Add to groupsByName
+					f.groupsByName[comp.ID] = append(f.groupsByName[comp.ID], group)
+
+					// Add to groupsByMAC for each MAC address
+					for _, mac := range comp.Mac {
+						if mac != "" && mac != "not available" && mac != "ff:ff:ff:ff:ff:ff" {
+							f.groupsByMAC[mac] = append(f.groupsByMAC[mac], group)
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	f.state = &smData
+	f.timestamp = time.Now().Unix()
 	return nil
 }

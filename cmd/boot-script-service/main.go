@@ -208,29 +208,6 @@ func sqlClose() {
 	}
 }
 
-func getNotifierURL() string {
-	if notifierURL == "" {
-		var err error
-		notifierURL, err = os.Hostname()
-		if err == nil {
-			if strings.Contains(notifierURL, "cray-bss") {
-				notifierURL = "cray-bss"
-			} else {
-				notifierURL += httpListen
-			}
-		} else {
-			// If all else fails, use localhost
-			// This may not work for NFD, but things are kind of
-			// messed up anyway if you can't get the hostname.
-			log.Printf("Could not get hostname: %s", err)
-			notifierURL = "localhost" + httpListen
-		}
-	}
-	url := "http://" + notifierURL + notifierEndpoint
-	log.Printf("Notification endpoint: %s", url)
-	return url
-}
-
 func parseEnvVars() error {
 	var (
 		err      error = nil
