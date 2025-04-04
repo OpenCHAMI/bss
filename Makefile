@@ -52,7 +52,7 @@ version:
 
 .PHONY: clean
 clean:
-	rm -f $(BINARIES)
+	rm -f $(BINARIES) .version
 
 .PHONY: snyk
 snyk:

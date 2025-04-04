@@ -11,3 +11,7 @@ kubernetes/.packaged/
 *.pem
 dist/
 
+# files built by make binaries
+/.version
+/boot-script-service
+/bss-init
