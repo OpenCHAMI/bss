@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright © 2023 Contributors to the OpenCHAMI Project
+// Copyright © 2024-2025 Contributors to the OpenCHAMI Project
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
