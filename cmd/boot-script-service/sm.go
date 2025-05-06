@@ -369,7 +369,7 @@ func getStateFromHSM() *SMData {
 		type myCompEndpt struct {
 			ID           string `json:"ID"`
 			Enabled      *bool  `json:"Enabled"`
-			RfEndpointID string `json: "RedfishEndpointID"`
+			RfEndpointID string `json:"RedfishEndpointID"`
 		}
 		type myCompEndptArray struct {
 			CompEndpts []*myCompEndpt `json:"ComponentEndpoints"`

@@ -59,10 +59,10 @@ const (
 
 type BootDataStore struct {
 	Params        string             `json:"params,omitempty"`
-	Kernel        string             `json:"kernel,omitempty"`        // Image storage key
-	Initrd        string             `json:"initrd,omitempty"`        // Image storage key
-	CloudInit     bssTypes.CloudInit `json:"cloud-init,omitempty"`    // Image storage key
-	ReferralToken string             `json:"referral-token,omitempty` // UUID
+	Kernel        string             `json:"kernel,omitempty"`         // Image storage key
+	Initrd        string             `json:"initrd,omitempty"`         // Image storage key
+	CloudInit     bssTypes.CloudInit `json:"cloud-init,omitempty"`     // Image storage key
+	ReferralToken string             `json:"referral-token,omitempty"` // UUID
 }
 
 type ImageData struct {
