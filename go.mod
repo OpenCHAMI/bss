@@ -1,8 +1,8 @@
 module github.com/OpenCHAMI/bss
 
-go 1.23
-toolchain go1.24.1
+go 1.23.0
 
+toolchain go1.24.2
 
 require (
 	github.com/Cray-HPE/hms-base v1.15.1
@@ -28,6 +28,7 @@ require (
 	github.com/openchami/chi-middleware/auth v0.0.0-20240812224658-b16b83c70700
 	github.com/openchami/chi-middleware/log v0.0.0-20240812224658-b16b83c70700
 	github.com/rs/zerolog v1.33.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
@@ -37,6 +38,7 @@ require (
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
@@ -65,6 +67,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
@@ -83,4 +86,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241104194629-dd2ea8efbc28 // indirect
 	google.golang.org/grpc v1.68.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
