@@ -41,8 +41,8 @@ type serviceStatus struct {
 }
 
 type storageBackend struct {
-	Name   string `json:"name",omitempty`
-	Status string `json:"status",omitempty`
+	Name   string `json:"name,omitempty"`
+	Status string `json:"status,omitempty"`
 }
 
 func serviceStatusAPI(w http.ResponseWriter, req *http.Request) {

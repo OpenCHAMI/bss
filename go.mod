@@ -3,6 +3,7 @@ module github.com/OpenCHAMI/bss
 go 1.23
 toolchain go1.24.1
 
+
 require (
 	github.com/Cray-HPE/hms-base v1.15.1
 	github.com/Cray-HPE/hms-hmetcd v1.11.0
