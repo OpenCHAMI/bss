@@ -28,11 +28,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 
 	"github.com/OpenCHAMI/bss/pkg/bssTypes"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+const testData = "testdata"
 
 func mockGetSignedS3Url(s3Url string) (string, error) {
 	return s3Url + "_signed", nil
@@ -309,5 +315,145 @@ func TestBootparametersPost_StoreError(t *testing.T) {
 	if status := rr.Code; status != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusBadRequest)
+	}
+}
+
+func TestBuildBootScript(t *testing.T) {
+	type args struct {
+		bd      BootData
+		sp      scriptParams
+		chain   string
+		role    string
+		subRole string
+		descr   string
+	}
+
+	tests := []struct {
+		desc   string
+		expect string
+		err    error
+		args   args
+	}{
+		{
+			// successfully generate a boot script using garbage values for all possible input fields
+			// this serves as an exhaustive template for new cases
+			desc:   "generic example",
+			expect: "garbage_val.txt",
+			err:    nil,
+			args: args{
+				bd: BootData{
+					Params: "bd_params",
+					Kernel: ImageData{
+						Path:   "kernel_path",
+						Params: "kernel_params",
+					},
+					Initrd: ImageData{
+						Path:   "initrd_path",
+						Params: "initrd_params",
+					},
+					CloudInit: bssTypes.CloudInit{
+						MetaData: map[string]interface{}{
+							"metadata_key": "metadata_val",
+						},
+						UserData: map[string]interface{}{
+							"userdata_key": "userdata_val",
+						},
+						PhoneHome: bssTypes.PhoneHome{
+							PublicKeyDSA:     "phonehome_pubkeydsa",
+							PublicKeyRSA:     "phonehome_pubkeyrsa",
+							PublicKeyECDSA:   "phonehome_pubkeyecdsa",
+							PublicKeyED25519: "phonehome_pubkeyed25519",
+							InstanceID:       "phonehome_instanceid",
+							Hostname:         "phonehome_hostname",
+							FQDN:             "phonehome_fqdn",
+						},
+					},
+				},
+				sp: scriptParams{
+					xname:         "sp_xname",
+					nid:           "sp_nid",
+					referralToken: "sp_rt",
+				},
+				chain:   "chain_val",
+				role:    "role_val",
+				subRole: "subrole_val",
+				descr:   "descr_val",
+			},
+		},
+		{
+			desc:   "missing kernel path",
+			expect: "",
+			err:    fmt.Errorf("busted: this host not configured for booting."),
+			args: args{
+				descr: "busted",
+				bd: BootData{
+					Kernel: ImageData{
+						Params: "busted",
+					},
+				},
+			},
+		},
+		{
+			desc:   "override ds param",
+			expect: "ds_override.txt",
+			err:    nil,
+			args: args{
+				bd: BootData{
+					Params: "ds=override-example;subparam=foo",
+					Kernel: ImageData{
+						Path:   "kernel_path",
+						Params: "kernel_params",
+					},
+					Initrd: ImageData{
+						Path:   "initrd_path",
+						Params: "initrd_params",
+					},
+					CloudInit: bssTypes.CloudInit{
+						MetaData: map[string]interface{}{
+							"metadata_key": "metadata_val",
+						},
+						UserData: map[string]interface{}{
+							"userdata_key": "userdata_val",
+						},
+						PhoneHome: bssTypes.PhoneHome{
+							PublicKeyDSA:     "phonehome_pubkeydsa",
+							PublicKeyRSA:     "phonehome_pubkeyrsa",
+							PublicKeyECDSA:   "phonehome_pubkeyecdsa",
+							PublicKeyED25519: "phonehome_pubkeyed25519",
+							InstanceID:       "phonehome_instanceid",
+							Hostname:         "phonehome_hostname",
+							FQDN:             "phonehome_fqdn",
+						},
+					},
+				},
+				sp: scriptParams{
+					xname:         "sp_xname",
+					nid:           "sp_nid",
+					referralToken: "sp_rt",
+				},
+				chain:   "chain_val",
+				role:    "role_val",
+				subRole: "subrole_val",
+				descr:   "descr_val",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		parent := t.Name()
+		t.Run(tt.desc, func(t *testing.T) {
+			var expect string
+			if tt.expect != "" {
+				expectBytes, err := os.ReadFile(filepath.Join(testData, parent, tt.expect))
+				require.NoError(t, err)
+				expect = string(expectBytes)
+			}
+
+			actual, err := buildBootScript(tt.args.bd, tt.args.sp, tt.args.chain, tt.args.role, tt.args.subRole, tt.args.descr)
+			if expect != "" {
+				assert.Equal(t, expect, actual)
+			}
+			assert.Equal(t, tt.err, err)
+		})
 	}
 }

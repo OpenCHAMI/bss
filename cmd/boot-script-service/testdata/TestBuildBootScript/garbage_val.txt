@@ -1,0 +1,7 @@
+#!ipxe
+kernel --name kernel kernel_path initrd=initrd bd_params kernel_params  xname=sp_xname nid=sp_nid bss_referral_token=sp_rt ds=nocloud-net;s=/ || goto boot_retry
+initrd --name initrd initrd_path || goto boot_retry
+boot || goto boot_retry
+:boot_retry
+sleep 30
+chain_val
