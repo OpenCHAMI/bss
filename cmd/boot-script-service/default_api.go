@@ -829,6 +829,21 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 	debugf("bd: %v\n", bd)
 	debugf("comp: %v\n", comp)
 
+	is_json, _ := getIntParam(r, "json", 0)
+	if is_json != 0 {
+		b, err := json.Marshal(bd)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Failed to marshal JSON response: %v", err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write(b)
+		return
+	}
+
 	var script string
 	var err error
 
