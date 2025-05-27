@@ -71,11 +71,11 @@ type ImageData struct {
 }
 
 type BootData struct {
-	Params        string
-	Kernel        ImageData
-	Initrd        ImageData
-	CloudInit     bssTypes.CloudInit
-	ReferralToken string
+	Params        string             `json:"params,omitempty"`
+	Kernel        ImageData          `json:"kernel,omitempty"`
+	Initrd        ImageData          `json:"initrd,omitempty"`
+	CloudInit     bssTypes.CloudInit `json:"-"`
+	ReferralToken string             `json:"-"`
 }
 
 const DefaultTag = "Default"
