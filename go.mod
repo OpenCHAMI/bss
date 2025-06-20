@@ -1,8 +1,8 @@
 module github.com/OpenCHAMI/bss
 
-go 1.23
-toolchain go1.24.1
+go 1.23.0
 
+toolchain go1.24.1
 
 require (
 	github.com/Cray-HPE/hms-base v1.15.1
@@ -21,7 +21,7 @@ require (
 	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
 	github.com/OpenCHAMI/smd/v2 v2.17.7
 	github.com/go-chi/chi v1.5.5
-	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-chi/chi/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.18.1
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/lestrrat-go/jwx v1.2.30
