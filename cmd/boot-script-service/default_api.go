@@ -646,8 +646,7 @@ func buildBootScript(bd BootData, sp scriptParams, chain, role, subRole, descr s
 	script := "#!ipxe\n"
 	params, err := buildParams(bd, sp, role, subRole)
 	if err != nil {
-		// TODO: HANDLE PARAM BUILDING ERROR HERE.
-		return "", fmt.Errorf("need to figure out how to handle this error")
+		return "", err
 	}
 
 	u := bd.Kernel.Path
@@ -710,7 +709,7 @@ func buildParams(bd BootData, sp scriptParams, role, subRole string) (string, er
 		err = nil
 	}
 
-	// TODO: This is confusing, should add a comment over this.
+	// if bootdata specifies an initrd, add "initrd=initrd" to params (deleting any existing occurrence)
 	if bd.Initrd.Path != "" {
 		start := strings.Index(params, "initrd")
 		if start != -1 {
@@ -851,8 +850,7 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 	if is_json != 0 {
 		params, err := buildParams(bd, sp, comp.Role, comp.SubRole)
 		if err != nil {
-			// TODO: handling this error may be a lot of logic, I should figure that out. could intersect w/ updating state.
-			message := fmt.Sprintf("Failed to build params, but I can't fully describe yet: %v", err)
+			message := fmt.Sprintf("Failed to build params: %v", err)
 			base.SendProblemDetailsGeneric(w, http.StatusInternalServerError, message)
 			return
 		}
@@ -860,7 +858,6 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 		bd.Params = "kernel " + params
 		b, err := json.Marshal(bd)
 		if err != nil {
-			// TODO: if the SendProblemDetailsGeneric works above maybe should do it here too. there's only 2 places where this way of printing error is used.
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Failed to marshal JSON response: %v", err)
 			return
