@@ -209,6 +209,15 @@ paths:
           in: query
           type: integer
           description: Node ID (NID) of host requesting boot script
+        - name: json
+          in: query
+          type: integer
+          default: 0
+          description: >-
+            If nonzero, a JSON object will be returned instead of an iPXE boot script.
+            TODO: it would make sense to give a schema for this object,
+            but Swagger doesn't expect a query parameter to change the output
+            schema because this is a weird way to implement it.
         - name: retry
           in: query
           type: integer
