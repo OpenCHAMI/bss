@@ -213,11 +213,11 @@ paths:
           in: query
           type: integer
           default: 0
+          # TODO: it would make sense to give a schema for this object, but
+          # Swagger doesn't expect a query parameter to change the output
+          # schema because this is a weird way to implement it.
           description: >-
             If nonzero, a JSON object will be returned instead of an iPXE boot script.
-            TODO: it would make sense to give a schema for this object,
-            but Swagger doesn't expect a query parameter to change the output
-            schema because this is a weird way to implement it.
         - name: retry
           in: query
           type: integer
