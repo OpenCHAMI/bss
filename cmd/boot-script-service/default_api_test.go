@@ -256,7 +256,7 @@ func TestBuildParams_Success(t *testing.T) {
 				xname: "x0000c0s0b0n0",
 				nid:   "0",
 			},
-			fmt.Sprintf("initrd=initrd root=nfs:example/path/to/rootfs:ro xname=x0000c0s0b0n0 nid=0 ds=nocloud-net;s=%s/", advertiseAddress),
+			fmt.Sprintf("initrd=initrd  root=nfs:example/path/to/rootfs:ro xname=x0000c0s0b0n0 nid=0 ds=nocloud-net;s=%s/", advertiseAddress),
 		},
 		{
 			// initrd already in bootdata params (at the end)
@@ -269,7 +269,7 @@ func TestBuildParams_Success(t *testing.T) {
 				xname: "x0000c0s0b0n0",
 				nid:   "0",
 			},
-			fmt.Sprintf("initrd=initrd root=nfs:example/path/to/rootfs:ro xname=x0000c0s0b0n0 nid=0 ds=nocloud-net;s=%s/", advertiseAddress),
+			fmt.Sprintf("initrd=initrd root=nfs:example/path/to/rootfs:ro  xname=x0000c0s0b0n0 nid=0 ds=nocloud-net;s=%s/", advertiseAddress),
 		},
 	}
 
