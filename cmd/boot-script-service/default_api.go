@@ -669,7 +669,7 @@ func buildBootScript(bd BootData, sp scriptParams, chain, role, subRole, descr s
 	return script, err
 }
 
-// Function buildParams() constructs the full parameter list based on the
+// buildParams constructs the full parameter list based on the
 // BootData and additional parameters provided, accounting for special
 // parameters.  The params are returned as a string.  If an error occurs, an
 // empty string is returned along with the error.
