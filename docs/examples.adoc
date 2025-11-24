@@ -103,6 +103,28 @@ Identify the node which expects to receive an iPXE boot script.
 
 ----
 
+[source, bash]
+.Use curl to request boot script components in JSON
+----
+
+    curl 'https://sms-1/apis/bss/boot/v1/bootscript?mac=44:A8:42:21:A8:AD&json=1'
+----
+
+[source, json]
+.A JSON object similar to the following will be returned:
+----
+
+    {
+        "params": "kernel bootname=x0c0s7b0n0 console=ttyS0,115200 console=tty0 unregistered=1 heartbeat_url=http://sms-1/apis/hbtd/heartbeat bootmac=44:A8:42:21:A8:AD",
+        "kernel": {
+            "path": "http://sms-1/apis/ars/assets/artifacts/generic/vmlinuz_801"
+        },
+        "initrd": {
+            "path": "http://sms-1/apis/ars/assets/artifacts/generic/initramfs-cray_1058.img"
+        }
+    }
+----
+
 === Retrieve current boot parameters for one or more nodes
 Make a GET request to /bootparameters endpoint.
 Specifiy a list of nodes to retrieve parameters for. If no nodes are given, will return all nodes which currently have parameter settings.

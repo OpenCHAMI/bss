@@ -643,6 +643,38 @@ func buildBootScript(bd BootData, sp scriptParams, chain, role, subRole, descr s
 		return "", fmt.Errorf("%s: this host not configured for booting.", descr)
 	}
 
+	script := "#!ipxe\n"
+	params, err := buildParams(bd, sp, role, subRole)
+	if err != nil {
+		return "", err
+	}
+
+	u := bd.Kernel.Path
+	u, err = checkURL(u)
+	if err == nil {
+		script += "kernel --name kernel " + u + " " + strings.Trim(params, " ")
+		script += " || goto boot_retry\n"
+		if bd.Initrd.Path != "" {
+			u, err = checkURL(bd.Initrd.Path)
+			if err == nil {
+				script += "initrd --name initrd " + u + " || goto boot_retry\n"
+			}
+		}
+		script += "boot || goto boot_retry\n:boot_retry\n"
+		// We could vary the length of the sleep based on retry count or some
+		// other criteria.
+		// For now, just sleep a bit
+		script += fmt.Sprintf("sleep %d\n", retryDelay) + chain + "\n"
+	}
+	return script, err
+}
+
+// buildParams constructs the full parameter list based on the
+// BootData and additional parameters provided, accounting for special
+// parameters.  The params are returned as a string.  If an error occurs, an
+// empty string is returned along with the error.
+func buildParams(bd BootData, sp scriptParams, role, subRole string) (string, error) {
+	debugf("buildParams(%v, %v, %v, %v)", bd, sp, role, subRole)
 	params := bd.Params
 	if bd.Kernel.Params != "" {
 		params += " " + bd.Kernel.Params
@@ -677,7 +709,7 @@ func buildBootScript(bd BootData, sp scriptParams, chain, role, subRole, descr s
 		err = nil
 	}
 
-	script := "#!ipxe\n"
+	// if bootdata specifies an initrd, add "initrd=initrd" to params (deleting any existing occurrence)
 	if bd.Initrd.Path != "" {
 		start := strings.Index(params, "initrd")
 		if start != -1 {
@@ -689,24 +721,8 @@ func buildBootScript(bd BootData, sp scriptParams, chain, role, subRole, descr s
 		}
 		params = "initrd=initrd " + params
 	}
-	u := bd.Kernel.Path
-	u, err = checkURL(u)
-	if err == nil {
-		script += "kernel --name kernel " + u + " " + strings.Trim(params, " ")
-		script += " || goto boot_retry\n"
-		if bd.Initrd.Path != "" {
-			u, err = checkURL(bd.Initrd.Path)
-			if err == nil {
-				script += "initrd --name initrd " + u + " || goto boot_retry\n"
-			}
-		}
-		script += "boot || goto boot_retry\n:boot_retry\n"
-		// We could vary the length of the sleep based on retry count or some
-		// other criteria.
-		// For now, just sleep a bit
-		script += fmt.Sprintf("sleep %d\n", retryDelay) + chain + "\n"
-	}
-	return script, err
+
+	return params, nil
 }
 
 // Function unknownBootScript() constructs the boot script for an unknown host
@@ -825,12 +841,21 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 		log.Printf("BSS request failed: bootscript request without mac=, name=, or nid= parameter")
 		return
 	}
+	sp := scriptParams{comp.ID, comp.NID.String(), bd.ReferralToken}
 
 	debugf("bd: %v\n", bd)
 	debugf("comp: %v\n", comp)
 
 	is_json, _ := getIntParam(r, "json", 0)
 	if is_json != 0 {
+		params, err := buildParams(bd, sp, comp.Role, comp.SubRole)
+		if err != nil {
+			message := fmt.Sprintf("Failed to build params: %v", err)
+			base.SendProblemDetailsGeneric(w, http.StatusInternalServerError, message)
+			return
+		}
+
+		bd.Params = "kernel " + params
 		b, err := json.Marshal(bd)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -891,7 +916,6 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 			if mac == "" && comp.Mac != nil {
 				mac = comp.Mac[0]
 			}
-			sp := scriptParams{comp.ID, comp.NID.String(), bd.ReferralToken}
 			chain := "chain " + chainProto + "://" + ipxeServer + gwURI + r.URL.Path
 			if mac != "" {
 				chain += "?mac=" + mac

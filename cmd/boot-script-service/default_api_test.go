@@ -28,7 +28,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/OpenCHAMI/bss/pkg/bssTypes"
@@ -183,6 +185,148 @@ func TestReplaceS3Params_error(t *testing.T) {
 	}
 	if newParams != expected_params {
 		t.Errorf("replaceS3Params failed.\n  expected: %s\n  actual: %s\n", expected_params, newParams)
+	}
+}
+
+func TestBuildParams_Success(t *testing.T) {
+	test_cases := []struct {
+		bd             BootData
+		sp             scriptParams
+		expectedParams []string
+	}{
+		{
+			// basic usage
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// bss referral token
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname:         "x0000c0s0b0n0",
+				nid:           "0",
+				referralToken: "meaningless_but_nonempty_string",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				"bss_referral_token=meaningless_but_nonempty_string",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// params set under kernel
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz", Params: "kernel_param=set"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"kernel_param=set",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// params set under initrd
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img", Params: "init_param=set"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"init_param=set",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// initrd already in bootdata params
+			BootData{
+				Params: "initrd=should_get_deleted root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// initrd already in bootdata params (at the end)
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro initrd=should_get_deleted",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			}},
+	}
+
+	for _, tc := range test_cases {
+		// role and subRole are only used when adding spire jopin tokens, which we can't test for this way.
+		output, err := buildParams(tc.bd, tc.sp, "dummy role", "dummy subRole")
+		if err != nil {
+			t.Errorf("Failed to build params: %v\n", err)
+		}
+
+		outputParams := strings.Fields(output)
+		if !reflect.DeepEqual(tc.expectedParams, outputParams) {
+			t.Log("Built params did not match.")
+			t.Logf("  expected: %v", tc.expectedParams)
+			t.Logf("  got:      %v", outputParams)
+			t.Fail()
+		}
 	}
 }
 
