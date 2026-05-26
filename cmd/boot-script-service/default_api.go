@@ -89,6 +89,7 @@ type scriptParams struct {
 	xname         string
 	nid           string
 	referralToken string
+	mac           string
 }
 
 // Note that we allow an empty string if the env variable is defined as such.
@@ -689,6 +690,11 @@ func buildParams(bd BootData, sp scriptParams, role, subRole string) (string, er
 	if sp.referralToken != "" {
 		params = checkParam(params, "bss_referral_token=", sp.referralToken)
 	}
+	// Add BOOTIF to params to force 1st mac
+	if sp.mac != "" {
+		bootif := "01-" + strings.ReplaceAll(sp.mac, ":", "-")
+		params = checkParam(params, "BOOTIF=", bootif)
+	}
 
 	// Inject the cloud init address info into the kernel params. If the target
 	// image does not have cloud-init enabled this wont hurt anything.
@@ -841,7 +847,7 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 		log.Printf("BSS request failed: bootscript request without mac=, name=, or nid= parameter")
 		return
 	}
-	sp := scriptParams{comp.ID, comp.NID.String(), bd.ReferralToken}
+	sp := scriptParams{comp.ID, comp.NID.String(), bd.ReferralToken, mac}
 
 	debugf("bd: %v\n", bd)
 	debugf("comp: %v\n", comp)
