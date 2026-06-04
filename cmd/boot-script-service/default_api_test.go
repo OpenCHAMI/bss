@@ -311,6 +311,113 @@ func TestBuildParams_Success(t *testing.T) {
 				"nid=0",
 				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
 			}},
+		{
+			// BOOTIF injection with MAC address
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+				mac:   "aa:bb:cc:dd:ee:ff",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				"BOOTIF=01-aa-bb-cc-dd-ee-ff",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// No BOOTIF injection when mac is empty
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+				mac:   "",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// Existing BOOTIF in params is preserved (not overwritten)
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro BOOTIF=01-11-22-33-44-55-66",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+				mac:   "aa:bb:cc:dd:ee:ff",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"BOOTIF=01-11-22-33-44-55-66",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// BOOTIF with uppercase MAC address
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname: "x0000c0s0b0n0",
+				nid:   "0",
+				mac:   "AA:BB:CC:DD:EE:FF",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				"BOOTIF=01-AA-BB-CC-DD-EE-FF",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
+		{
+			// BOOTIF with all parameters (mac, referralToken, kernel params)
+			BootData{
+				Params: "root=nfs:example/path/to/rootfs:ro",
+				Kernel: ImageData{Path: "http://example/path/to/vmlinuz", Params: "console=ttyS0"},
+				Initrd: ImageData{Path: "http://example/path/to/initramfs.img"},
+			},
+			scriptParams{
+				xname:         "x0000c0s0b0n0",
+				nid:           "0",
+				referralToken: "test_token",
+				mac:           "00:11:22:33:44:55",
+			},
+			[]string{
+				"initrd=initrd",
+				"root=nfs:example/path/to/rootfs:ro",
+				"console=ttyS0",
+				"xname=x0000c0s0b0n0",
+				"nid=0",
+				"bss_referral_token=test_token",
+				"BOOTIF=01-00-11-22-33-44-55",
+				fmt.Sprintf("ds=nocloud-net;s=%s/", advertiseAddress),
+			},
+		},
 	}
 
 	for _, tc := range test_cases {
