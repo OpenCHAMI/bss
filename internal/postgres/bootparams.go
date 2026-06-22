@@ -265,7 +265,7 @@ func (bddb BootDataDatabase) CheckNodeExistence(macs, xnames []string, nids []in
 
 	// Iterate through each slice of mac/xname/nid and categorize each's existence.
 	for _, m := range macs {
-		if _, ok := macToNode[m]; !ok {
+		if _, ok := macToNode[strings.ToLower(m)]; !ok {
 			nonExistingMacs = append(nonExistingMacs, m)
 		}
 	}
@@ -525,7 +525,12 @@ func (bddb BootDataDatabase) getNodesWithConfigs(macs, xnames []string, nids []i
 				}
 				switch i {
 				case 0:
-					qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macs))
+					// Ignore case when searching by MAC.
+					var macsLower []string
+					for _, mac := range macs {
+						macsLower = append(macsLower, strings.ToLower(mac))
+					}
+					qstr += fmt.Sprintf(` boot_mac IN %s`, stringSliceToSql(macsLower))
 				case 1:
 					qstr += fmt.Sprintf(` xname IN %s`, stringSliceToSql(xnames))
 				case 2:
