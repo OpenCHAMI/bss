@@ -49,7 +49,7 @@ import (
 	"time"
 
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
-	"github.com/OpenCHAMI/bss/internal/postgres"
+	"github.com/openchami/bss/internal/postgres"
 )
 
 const (

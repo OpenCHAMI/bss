@@ -33,7 +33,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/OpenCHAMI/bss/pkg/bssTypes"
+	"github.com/openchami/bss/pkg/bssTypes"
 
 	yaml "gopkg.in/yaml.v2"
 

@@ -45,8 +45,8 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base"
-	"github.com/OpenCHAMI/smd/v2/pkg/rf"
-	"github.com/OpenCHAMI/smd/v2/pkg/sm"
+	"github.com/openchami/smd/v2/pkg/redfish"
+	"github.com/openchami/smd/v2/pkg/sm"
 )
 
 const (

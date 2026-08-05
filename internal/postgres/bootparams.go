@@ -28,10 +28,10 @@ import (
 	"strings"
 
 	"github.com/Cray-HPE/hms-xname/xnames"
-	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 	"github.com/docker/distribution/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/openchami/bss/pkg/bssTypes"
 )
 
 type Node struct {
