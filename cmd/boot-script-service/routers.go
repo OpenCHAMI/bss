@@ -45,8 +45,8 @@ import (
 
 	base "github.com/Cray-HPE/hms-base"
 	"github.com/OpenCHAMI/jwtauth/v5"
-	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/hashicorp/go-retryablehttp"
 	openchami_authenticator "github.com/openchami/chi-middleware/auth"
 	openchami_logger "github.com/openchami/chi-middleware/log"
