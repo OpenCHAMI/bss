@@ -43,9 +43,9 @@ import (
 
 	base "github.com/Cray-HPE/hms-base"
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
-	"github.com/OpenCHAMI/bss/pkg/bssTypes"
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/uuid"
+	"github.com/openchami/bss/pkg/bssTypes"
 )
 
 const (

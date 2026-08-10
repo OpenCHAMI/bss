@@ -33,7 +33,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/OpenCHAMI/bss/pkg/bssTypes"
+	"github.com/openchami/bss/pkg/bssTypes"
 )
 
 func mockGetSignedS3Url(s3Url string) (string, error) {

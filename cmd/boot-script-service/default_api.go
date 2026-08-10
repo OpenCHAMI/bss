@@ -55,7 +55,7 @@ import (
 	base "github.com/Cray-HPE/hms-base"
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
 	hms_s3 "github.com/Cray-HPE/hms-s3"
-	"github.com/OpenCHAMI/bss/pkg/bssTypes"
+	"github.com/openchami/bss/pkg/bssTypes"
 )
 
 const (

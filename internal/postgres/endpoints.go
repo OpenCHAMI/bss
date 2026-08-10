@@ -27,7 +27,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/OpenCHAMI/bss/pkg/bssTypes"
+	"github.com/openchami/bss/pkg/bssTypes"
 )
 
 type EndpointAccess struct {
