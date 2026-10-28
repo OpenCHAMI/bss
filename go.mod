@@ -18,7 +18,7 @@ require (
 	github.com/Cray-HPE/hms-xname v1.4.0
 	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
 	github.com/go-chi/chi v1.5.5
-	github.com/go-chi/chi/v5 v5.3.1
+	github.com/go-chi/chi/v5 v5.4.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/lestrrat-go/jwx v1.2.30
