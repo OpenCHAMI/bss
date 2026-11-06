@@ -163,7 +163,7 @@ func checkURL(u string) (string, error) {
 		info, err := hms_s3.LoadConnectionInfoFromEnvVars()
 		info.Bucket = bucket
 		if err != nil {
-			log.Printf("Failed to load S3 connection info: %s", err)
+			log.Print("event=s3_connection_configuration_failed error_class=configuration_error")
 		}
 		s3Client, err = hms_s3.NewS3Client(info, httpClient)
 	} else {
@@ -284,7 +284,6 @@ func BootparametersGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	debugf("Received boot parameters: %v\n", args)
 	var results []bssTypes.BootParams
 	if useSQL {
 		debugf("SqlGetBootParams(%v, %v, %v)", args.Macs, args.Hosts, args.Nids)
@@ -341,7 +340,6 @@ func BootparametersGet(w http.ResponseWriter, r *http.Request) {
 					log.Printf("Failed to parse etcd value for %s: %v\n", name, parseErr)
 				}
 
-				debugf("Found %s: %v | %v\n", name, bd, smc)
 				var bp bssTypes.BootParams
 				ok := false
 				for _, v := range args.Hosts {
@@ -422,13 +420,9 @@ func BootparametersGet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func LogBootParameters(prefix string, v interface{}) {
-	j, e := json.MarshalIndent(v, "", "  ")
-	if e == nil {
-		log.Printf("%s: %s", prefix, j)
-	} else {
-		log.Printf("%s: %v", prefix, v)
-	}
+// Boot parameters can contain credentials; log the operation without its data.
+func LogBootParameters(prefix string, _ interface{}) {
+	log.Print(prefix)
 }
 
 func BootparametersPost(w http.ResponseWriter, r *http.Request) {
@@ -446,7 +440,7 @@ func BootparametersPost(w http.ResponseWriter, r *http.Request) {
 	err = args.CheckMacs()
 	if err != nil {
 		// Invalid MAC address format (if included), invalid request
-		LogBootParameters(fmt.Sprintf("/bootparameters POST FAILED: %s", err.Error()), args)
+		LogBootParameters("/bootparameters POST FAILED", args)
 		base.SendProblemDetailsGeneric(w, http.StatusBadRequest,
 			fmt.Sprintf("Bad Request: %s", err))
 		return
@@ -455,13 +449,12 @@ func BootparametersPost(w http.ResponseWriter, r *http.Request) {
 	err = args.CheckXnames()
 	if err != nil {
 		// Invalid xname format (if included), invalid request
-		LogBootParameters(fmt.Sprintf("/bootparameters POST FAILED: %s", err.Error()), args)
+		LogBootParameters("/bootparameters POST FAILED", args)
 		base.SendProblemDetailsGeneric(w, http.StatusBadRequest,
 			fmt.Sprintf("Bad Request: %s", err))
 		return
 	}
 	// Fields appear to be correct.  Continue with processing.
-	debugf("Received boot parameters: %v\n", args)
 	err, referralToken := StoreNew(args)
 	if err == nil {
 		LogBootParameters("/bootparameters POST", args)
@@ -471,7 +464,7 @@ func BootparametersPost(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusCreated)
 	} else {
-		LogBootParameters(fmt.Sprintf("/bootparameters POST FAILED: %s", err.Error()), args)
+		LogBootParameters("/bootparameters POST FAILED", args)
 		base.SendProblemDetailsGeneric(w, http.StatusBadRequest,
 			fmt.Sprintf("Bad Request: %s", err))
 	}
@@ -492,12 +485,11 @@ func BootparametersPut(w http.ResponseWriter, r *http.Request) {
 	err = args.CheckMacs()
 	if err != nil {
 		// Invalid MAC address format (if included), invalid request
-		LogBootParameters(fmt.Sprintf("/bootparameters PUT FAILED: %s", err.Error()), args)
+		LogBootParameters("/bootparameters PUT FAILED", args)
 		base.SendProblemDetailsGeneric(w, http.StatusBadRequest,
 			fmt.Sprintf("Bad Request: %s", err))
 		return
 	}
-	debugf("Received boot parameters: %v\n", args)
 	err, referralToken := Store(args)
 	if err == nil {
 		LogBootParameters("/bootparameters PUT", args)
@@ -507,7 +499,7 @@ func BootparametersPut(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 	} else {
-		LogBootParameters(fmt.Sprintf("/bootparameters PUT FAILED: %s", err.Error()), args)
+		LogBootParameters("/bootparameters PUT FAILED", args)
 		herr, ok := base.GetHMSError(err)
 		if ok && herr.GetProblem() != nil {
 			base.SendProblemDetails(w, herr.GetProblem(), 0)
@@ -532,15 +524,14 @@ func BootparametersPatch(w http.ResponseWriter, r *http.Request) {
 	err = args.CheckMacs()
 	if err != nil {
 		// Invalid MAC address format (if included), invalid request
-		LogBootParameters(fmt.Sprintf("/bootparameters PATCH FAILED: %s", err.Error()), args)
+		LogBootParameters("/bootparameters PATCH FAILED", args)
 		base.SendProblemDetailsGeneric(w, http.StatusBadRequest,
 			fmt.Sprintf("Bad Request: %s", err))
 		return
 	}
-	debugf("Received boot parameters: %v\n", args)
 	err = Update(args)
 	if err != nil {
-		LogBootParameters(fmt.Sprintf("/bootparameters PATCH FAILED: %s", err.Error()), args)
+		LogBootParameters("/bootparameters PATCH FAILED", args)
 		base.SendProblemDetailsGeneric(w, http.StatusNotFound,
 			fmt.Sprintf("Not Found: %s", err))
 	} else {
@@ -565,7 +556,7 @@ func BootparametersDelete(w http.ResponseWriter, r *http.Request) {
 		err = Remove(args)
 	}
 	if err != nil {
-		LogBootParameters(fmt.Sprintf("/bootparameters DELETE FAILED: %s", err.Error()), args)
+		LogBootParameters("/bootparameters DELETE FAILED", args)
 		base.SendProblemDetailsGeneric(w, http.StatusBadRequest, err.Error())
 	} else {
 		LogBootParameters("/bootparameters DELETE", args)
@@ -605,11 +596,9 @@ func paramExists(params, pname string) bool {
 // the parameter string, then it is unchanged.  The resultant parameter string
 // is returned.
 func checkParam(params, pname, pval string) string {
-	debugf("checkParam(\"%s\", \"%s\", \"%s\")\n", params, pname, pval)
 	if pval != "" && !paramExists(params, pname) {
 		params += " " + pname + pval
 	}
-	debugf("checkParam returning \"%s\"\n", params)
 	return params
 }
 
@@ -639,7 +628,6 @@ func paramSubstitute(params, pvar string, getVal paramValRetreiver) (string, err
 // returned as a string.  If an error occurs, a null string is returned along
 // with the error.
 func buildBootScript(bd BootData, sp scriptParams, chain, role, subRole, descr string) (string, error) {
-	debugf("buildBootScript(%v, %v, %v, %v, %v, %v)\n", bd, sp, chain, role, subRole, descr)
 	if bd.Kernel.Path == "" {
 		return "", fmt.Errorf("%s: this host not configured for booting.", descr)
 	}
@@ -675,7 +663,6 @@ func buildBootScript(bd BootData, sp scriptParams, chain, role, subRole, descr s
 // parameters.  The params are returned as a string.  If an error occurs, an
 // empty string is returned along with the error.
 func buildParams(bd BootData, sp scriptParams, role, subRole string) (string, error) {
-	debugf("buildParams(%v, %v, %v, %v)", bd, sp, role, subRole)
 	params := bd.Params
 	if bd.Kernel.Params != "" {
 		params += " " + bd.Kernel.Params
@@ -711,7 +698,7 @@ func buildParams(bd BootData, sp scriptParams, role, subRole string) (string, er
 
 	params, err = replaceS3Params(params, checkURL)
 	if err != nil {
-		log.Printf("Error replacing s3 URIs. error: %v, params:\n%s", err, params)
+		log.Print("event=s3_parameter_replacement_failed error_class=replacement_error")
 		err = nil
 	}
 
@@ -849,7 +836,6 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 	}
 	sp := scriptParams{comp.ID, comp.NID.String(), bd.ReferralToken, mac}
 
-	debugf("bd: %v\n", bd)
 	debugf("comp: %v\n", comp)
 
 	is_json, _ := getIntParam(r, "json", 0)
@@ -909,7 +895,7 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 		}
 		script, retreivingState, err = unknownBootScript(arch, mac, name, nid, ts, comp.Role, comp.SubRole, descr)
 		if err != nil {
-			debugf("unknownBootScript returned error: %s", err.Error())
+			debugf("unknownBootScript returned error: error_class=boot_script_error")
 		}
 	}
 	if !unknown || (unknown && err != nil && comp.ID != "") {
@@ -957,15 +943,11 @@ func BootscriptGet(w http.ResponseWriter, r *http.Request) {
 				updateEndpointAccessed(comp.ID, bssTypes.EndpointTypeBootscript)
 			}
 		} else {
-			log.Printf("BSS request failed writing response for %s: %s", descr, err.Error())
+			log.Printf("BSS request failed writing response for %s: error_class=response_write_error", descr)
 		}
 	} else {
 		base.SendProblemDetailsGeneric(w, http.StatusNotFound, err.Error())
-		if strings.HasPrefix(err.Error(), descr) {
-			log.Printf("BSS request failed: %s", err.Error())
-		} else {
-			log.Printf("BSS request failed for %s: %s", descr, err.Error())
-		}
+		log.Printf("BSS request failed for %s: error_class=boot_script_error", descr)
 	}
 }
 
@@ -1088,11 +1070,10 @@ func DumpstateGet(w http.ResponseWriter, r *http.Request) {
 					bp.Initrd = bd.Initrd.Path
 					results.Params = append(results.Params, bp)
 				} else {
-					debugf("WARNING: Unmarshalling boot data store for name %q and tag %v failed (not including in results): %v", name, x, err)
+					debugf("WARNING: Unmarshalling boot data store for name %q failed (not including in results)", name)
 				}
 			}
 			debugf("Retrieved names: %v", names)
-			debugf("Retrieved params: %v", results.Params)
 		} else {
 			log.Printf("DumpStateGet(): getTags(): %v", err)
 			err = fmt.Errorf("Error retrieving names from key-value store")

@@ -113,6 +113,10 @@ func TestFindSM(t *testing.T) {
 }
 
 func TestStoreAndLookup(t *testing.T) {
+	// This test counts the entire inventory; shuffled tests must not add
+	// unrelated records to its fixture.
+	usePhase1Store(t)
+
 	const vmlinuz string = "/test/path/vmlinuz"
 	tables := []bssTypes.BootParams{
 		{Hosts: []string{"Default"}, Params: "default", Kernel: vmlinuz, Initrd: "/test/path/initrd.gz"},

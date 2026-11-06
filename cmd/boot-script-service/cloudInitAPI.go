@@ -353,7 +353,7 @@ func phoneHomePostAPI(w http.ResponseWriter, r *http.Request) {
 	bp.CloudInit = bootdata.CloudInit
 
 	if err = Update(bp); err != nil {
-		LogBootParameters(fmt.Sprintf("/phone-home FAILED: %s", err.Error()), args)
+		LogBootParameters("/phone-home FAILED", args)
 		base.SendProblemDetailsGeneric(w, http.StatusNotFound,
 			fmt.Sprintf("Not Found: %s", err))
 		return
