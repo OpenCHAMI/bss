@@ -17,13 +17,13 @@ import (
 	"github.com/openchami/bss/pkg/bssTypes"
 )
 
-type phase1TokenTransport func(*http.Request) (*http.Response, error)
+type loggingTokenTransport func(*http.Request) (*http.Response, error)
 
-func (transport phase1TokenTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+func (transport loggingTokenTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	return transport(request)
 }
 
-func TestPhase1RenderedCredentialsStayOutOfLogs(t *testing.T) {
+func TestRenderedCredentialsStayOutOfLogs(t *testing.T) {
 	for _, debug := range []bool{false, true} {
 		name := "normal"
 		if debug {
@@ -46,7 +46,7 @@ func TestPhase1RenderedCredentialsStayOutOfLogs(t *testing.T) {
 			s3ParamsRegex = "fixture-private-regex["
 			spireTokensBaseURL = "http://spire.invalid"
 			called := false
-			spireTokenClient = &http.Client{Transport: phase1TokenTransport(func(*http.Request) (*http.Response, error) {
+			spireTokenClient = &http.Client{Transport: loggingTokenTransport(func(*http.Request) (*http.Response, error) {
 				called = true
 				return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"join_token":"` + joinToken + `"}`))}, nil
 			})}
@@ -69,8 +69,8 @@ func TestPhase1RenderedCredentialsStayOutOfLogs(t *testing.T) {
 	}
 }
 
-func TestPhase1StoredCredentialsStayOutOfLogs(t *testing.T) {
-	usePhase1Store(t)
+func TestStoredCredentialsStayOutOfLogs(t *testing.T) {
+	useIsolatedBootStore(t)
 	oldDebug, oldSQL, oldOutput := debugFlag, useSQL, log.Writer()
 	t.Cleanup(func() { debugFlag, useSQL = oldDebug, oldSQL; log.SetOutput(oldOutput) })
 	debugFlag, useSQL = true, false
@@ -96,8 +96,8 @@ func TestPhase1StoredCredentialsStayOutOfLogs(t *testing.T) {
 	}
 }
 
-func TestPhase1SafeBSSReadsRemainAnonymous(t *testing.T) {
-	usePhase1Store(t)
+func TestExistingReadAuthenticationBehavior(t *testing.T) {
+	useIsolatedBootStore(t)
 	oldURL, oldAuth, oldSQL := jwksURL, tokenAuth, useSQL
 	oldDebug, oldOutput := debugFlag, log.Writer()
 	t.Cleanup(func() {
@@ -110,7 +110,7 @@ func TestPhase1SafeBSSReadsRemainAnonymous(t *testing.T) {
 	var output bytes.Buffer
 	log.SetOutput(&output)
 	const params = "secret=fixture-public-boot-secret"
-	if err, _ := Store(bssTypes.BootParams{Hosts: []string{"x0c0s2b0n0"}, Params: params, Kernel: "https://images.invalid/phase1-public-kernel"}); err != nil {
+	if err, _ := Store(bssTypes.BootParams{Hosts: []string{"x0c0s2b0n0"}, Params: params, Kernel: "https://images.invalid/fixture-public-kernel"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, configuredAuth := range []bool{false, true} {
@@ -143,7 +143,7 @@ func TestPhase1SafeBSSReadsRemainAnonymous(t *testing.T) {
 	}
 }
 
-func TestPhase1CloudDataMergeFailureRedacted(t *testing.T) {
+func TestCloudDataMergeFailureRedacted(t *testing.T) {
 	oldOutput := log.Writer()
 	t.Cleanup(func() { log.SetOutput(oldOutput) })
 	var output bytes.Buffer

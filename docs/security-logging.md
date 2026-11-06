@@ -4,20 +4,24 @@
 # Boot credential logging
 
 Boot parameters, cloud-init data, referral/join tokens and signed image URLs can
-contain credentials. This patch removes payloads from the selected boot data
-storage and rendering diagnostics at normal and debug levels. Operation events
-and fixed failure classifications replace the payload-bearing messages in these
-paths. It does not audit every service or dependency log.
+contain credentials. Boot parameter request diagnostics, memory/SQL storage
+diagnostics, boot-script rendering and cloud-data merge failures omit those
+payloads at normal and debug log levels. S3 configuration, parameter replacement,
+phone-home storage and boot-script signer failures use fixed operation/failure
+events rather than raw credential-bearing errors. Dumpstate response encoding or
+write failures log `event=dumpstate_response_encode_failed` with the fixed
+`error_class=response_encode_error`, omitting the response inventory and raw error.
 
-This change preserves HTTP routes, response bodies/status codes, discovery,
-MAC/NID/name lookup precedence, storage and signer control flow. In particular,
-GET `/boot/v1/dumpstate`, `/boot/v1/endpoint-history` and `/boot/v1/hosts` remain
-anonymous when optional bootparameters authentication is configured. No CLI,
-configuration, credential or dependency migration is required.
+GET `/boot/v1/dumpstate`, `/boot/v1/endpoint-history` and `/boot/v1/hosts` are
+anonymous, including when optional bootparameters authentication is configured.
+Dumpstate returns stored boot parameters and image URLs, which can contain
+credentials. Anonymous access is existing behavior, not a guarantee that the
+returned data is safe to disclose outside the deployment's trusted network.
 
-This is a diagnostic-output fix, not complete API authorization or error-response
-redaction. Existing error responses and public data remain unchanged, including
-raw storage/signer error details; those require separate contract review. Logs
-retained from older versions may already contain sensitive values. Log parsers
-that depended on complete boot payloads or raw failure text must use the remaining
-operation/failure events instead.
+HTTP response bodies/status codes, discovery, MAC/NID/name lookup precedence,
+storage and signer behavior are unchanged. Some storage/signer errors are still
+returned verbatim in HTTP error responses and may expose sensitive values.
+Other service/dependency logs are outside the guarantees described here. Retained
+logs from older versions may contain credentials; changing diagnostic output does
+not remove old logs or rotate exposed credentials. Log consumers must use the
+remaining operation/failure events rather than full boot payloads or raw failures.

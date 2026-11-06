@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+//
 // MIT License
 //
 // (C) Copyright [2021-2022] Hewlett Packard Enterprise Development LP
@@ -115,7 +117,7 @@ func TestFindSM(t *testing.T) {
 func TestStoreAndLookup(t *testing.T) {
 	// This test counts the entire inventory; shuffled tests must not add
 	// unrelated records to its fixture.
-	usePhase1Store(t)
+	useIsolatedBootStore(t)
 
 	const vmlinuz string = "/test/path/vmlinuz"
 	tables := []bssTypes.BootParams{

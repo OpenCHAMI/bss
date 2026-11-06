@@ -20,15 +20,62 @@ import (
 	sm "github.com/openchami/smd/v2/pkg/sm"
 )
 
-type phase1FailingStore struct{ hmetcd.Kvi }
+type failingBootStore struct{ hmetcd.Kvi }
 
-func (s *phase1FailingStore) Store(string, string) error {
+type dumpstateFailingWriter struct {
+	*httptest.ResponseRecorder
+	writeErr  error
+	attempted []byte
+}
+
+func (writer *dumpstateFailingWriter) Write(data []byte) (int, error) {
+	writer.attempted = append(writer.attempted, data...)
+	return 0, writer.writeErr
+}
+
+func TestDumpstateResponseWriteFailureDoesNotLogCredentials(t *testing.T) {
+	for _, debug := range []bool{false, true} {
+		name := "normal"
+		if debug {
+			name = "debug"
+		}
+		t.Run(name, func(t *testing.T) {
+			useKnownBootNode(t)
+			const params = "secret=fixture-dumpstate-boot-secret"
+			const kernel = "https://images.invalid/kernel?signature=fixture-dumpstate-signed-url"
+			const writeError = "fixture-response-write-secret"
+			if err, _ := Store(bssTypes.BootParams{Hosts: []string{"x0c0s1b0n0"}, Params: params, Kernel: kernel}); err != nil {
+				t.Fatal(err)
+			}
+			oldDebug, oldOutput := debugFlag, log.Writer()
+			t.Cleanup(func() { debugFlag = oldDebug; log.SetOutput(oldOutput) })
+			var output bytes.Buffer
+			debugFlag = debug
+			log.SetOutput(&output)
+			writer := &dumpstateFailingWriter{ResponseRecorder: httptest.NewRecorder(), writeErr: errors.New(writeError)}
+			DumpstateGet(writer, httptest.NewRequest(http.MethodGet, "/boot/v1/dumpstate", nil))
+			if writer.Code != http.StatusOK || !bytes.Contains(writer.attempted, []byte(params)) || !bytes.Contains(writer.attempted, []byte("fixture-dumpstate-signed-url")) {
+				t.Fatal("dumpstate response write failure was not exercised with credential-bearing data")
+			}
+			for _, secret := range []string{params, "fixture-dumpstate-signed-url", writeError} {
+				if strings.Contains(output.String(), secret) {
+					t.Error("dumpstate write failure logged sensitive data")
+				}
+			}
+			if !strings.Contains(output.String(), "event=dumpstate_response_encode_failed error_class=response_encode_error") {
+				t.Error("missing fixed dumpstate failure event")
+			}
+		})
+	}
+}
+
+func (s *failingBootStore) Store(string, string) error {
 	return errors.New("fixture-backend-error")
 }
 
-func phase1KnownNode(t *testing.T) {
+func useKnownBootNode(t *testing.T) {
 	t.Helper()
-	usePhase1Store(t)
+	useIsolatedBootStore(t)
 	oldState, oldMap, oldStamp, oldSQL := smData, smDataMap, smTimeStamp, useSQL
 	oldBlocked := blockedRoles
 	t.Cleanup(func() {
@@ -44,13 +91,13 @@ func phase1KnownNode(t *testing.T) {
 	smDataMap, smTimeStamp, useSQL, blockedRoles = makeSmMap(smData), time.Now().Unix(), false, nil
 }
 
-func TestPhase1PhoneHomeStorageFailureRedacted(t *testing.T) {
-	phase1KnownNode(t)
+func TestPhoneHomeStorageFailureRedacted(t *testing.T) {
+	useKnownBootNode(t)
 	const secret = "fixture-existing-phone-home-secret"
 	if err, _ := Store(bssTypes.BootParams{Hosts: []string{"x0c0s1b0n0"}, Params: "secret=" + secret, Kernel: "https://images.invalid/phone-home-kernel"}); err != nil {
 		t.Fatal(err)
 	}
-	kvstore = &phase1FailingStore{Kvi: kvstore}
+	kvstore = &failingBootStore{Kvi: kvstore}
 	oldOutput := log.Writer()
 	t.Cleanup(func() { log.SetOutput(oldOutput) })
 	var output bytes.Buffer
@@ -67,8 +114,8 @@ func TestPhase1PhoneHomeStorageFailureRedacted(t *testing.T) {
 	}
 }
 
-func TestPhase1BootscriptSignerFailureRedacted(t *testing.T) {
-	phase1KnownNode(t)
+func TestBootscriptSignerFailureRedacted(t *testing.T) {
+	useKnownBootNode(t)
 	const sensitiveError = "https://signer.invalid/?credential=fixture-signer-secret"
 	if err, _ := Store(bssTypes.BootParams{Hosts: []string{"x0c0s1b0n0"}, Kernel: "s3://fixture/kernel"}); err != nil {
 		t.Fatal(err)

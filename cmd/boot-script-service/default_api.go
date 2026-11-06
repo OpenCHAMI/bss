@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+//
 // MIT License
 //
 // (C) Copyright [2021-2022] Hewlett Packard Enterprise Development LP
@@ -1087,7 +1089,7 @@ func DumpstateGet(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		err = json.NewEncoder(w).Encode(results)
 		if err != nil {
-			log.Printf("Yikes, I couldn't encode '%v' as a JSON status response: %s\n", results, err)
+			log.Print("event=dumpstate_response_encode_failed error_class=response_encode_error")
 		}
 	}
 }

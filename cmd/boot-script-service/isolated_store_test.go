@@ -12,22 +12,22 @@ import (
 
 // Isolate fixtures from hmetcd's process-global mem: map. Tests using this
 // store are serial and restore the original backend after every case.
-type phase1Store struct {
+type isolatedBootStore struct {
 	hmetcd.Kvi
 	records map[string]string
 }
 
-func (s *phase1Store) Get(key string) (string, bool, error) {
+func (s *isolatedBootStore) Get(key string) (string, bool, error) {
 	value, ok := s.records[key]
 	return value, ok, nil
 }
 
-func (s *phase1Store) Store(key, value string) error {
+func (s *isolatedBootStore) Store(key, value string) error {
 	s.records[key] = value
 	return nil
 }
 
-func (s *phase1Store) GetRange(start, end string) ([]hmetcd.Kvi_KV, error) {
+func (s *isolatedBootStore) GetRange(start, end string) ([]hmetcd.Kvi_KV, error) {
 	var keys []string
 	for key := range s.records {
 		if key >= start && key < end {
@@ -42,9 +42,9 @@ func (s *phase1Store) GetRange(start, end string) ([]hmetcd.Kvi_KV, error) {
 	return result, nil
 }
 
-func usePhase1Store(t *testing.T) {
+func useIsolatedBootStore(t *testing.T) {
 	t.Helper()
 	original := kvstore
-	kvstore = &phase1Store{Kvi: original, records: map[string]string{}}
+	kvstore = &isolatedBootStore{Kvi: original, records: map[string]string{}}
 	t.Cleanup(func() { kvstore = original })
 }
