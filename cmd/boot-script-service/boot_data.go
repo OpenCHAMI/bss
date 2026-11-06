@@ -105,15 +105,9 @@ func makeImageKey(imtype, path string) string {
 }
 
 func imageLookup(path, imtype string, kvl []hmetcd.Kvi_KV) (string, ImageData) {
-	debugf("imageLookup('%s', %s,  %v)\n", path, imtype, kvl)
 	for _, k := range kvl {
 		var imdata ImageData
 		err := json.Unmarshal([]byte(k.Value), &imdata)
-		if err == nil {
-			debugf("Unmarshal %s: %v", k.Value, imdata)
-		} else {
-			debugf("Unmarshal %s failed: %s", k.Value, err.Error())
-		}
 		if err == nil && imdata.Path == path {
 			return k.Key, imdata
 		}
@@ -167,19 +161,17 @@ func GetInitrdInfo() []ImageData {
 
 // Convert a data structure to json and store it at the given key
 func storeData(key string, v interface{}) error {
-	debugf("storeData(%s, %v)\n", key, v)
 	data, err := json.Marshal(v)
 	if err == nil {
 		value := string(data)
 		err = kvstore.Store(key, value)
-		debugf("kvstore.Store(%s, %s) -> %v\n", key, value, err)
 	}
 	if err != nil {
 		msg := fmt.Sprintf("Key %s storage of '%v' failed: %s\n", key, v, err.Error())
 		herr := base.NewHMSError("Storage", msg)
 		herr.AddProblem(base.NewProblemDetailsStatus(msg, http.StatusInternalServerError))
 		err = herr
-		debugf(msg)
+		debugf("event=boot_data_storage_failed error_class=storage_error")
 	}
 	return err
 }
@@ -204,7 +196,6 @@ func imageFind(path string, imtype string) string {
 var kvMutex sync.Mutex
 
 func imageStore(path string, imtype string) string {
-	debugf("ImageStore(%s, %s)\n", path, imtype)
 	kvMutex.Lock()
 	defer kvMutex.Unlock()
 	kvstore.DistTimedLock(5)
@@ -216,7 +207,6 @@ func imageStore(path string, imtype string) string {
 	if err == nil {
 		k, imdata = imageLookup(path, imtype, kvl)
 	}
-	debugf("imageLookup() -> (%s, %v)\n", k, imdata)
 	if k != "" {
 		// This path is already stored, return the key for it
 		return k
@@ -225,7 +215,7 @@ func imageStore(path string, imtype string) string {
 	imdata = ImageData{path, ""}
 	err = storeData(key, imdata)
 	if err != nil {
-		debugf("Cannot store %s path %s: %v\n", imtype, path, err)
+		debugf("event=boot_image_storage_failed error_class=storage_error")
 		key = ""
 	}
 	return key
@@ -236,7 +226,6 @@ func nidName(nid int) string {
 }
 
 func Remove(bp bssTypes.BootParams) error {
-	debugf("Remove(): Ready to remove %v\n", bp)
 	var err error
 	if useSQL {
 		var (
@@ -486,11 +475,9 @@ func SqlGetBootParams(macs, xnames []string, nids []int32) (results []bssTypes.B
 func StoreNew(bp bssTypes.BootParams) (error, string) {
 	// postgres.Add will handle duplicates.
 	if useSQL {
-		debugf("postgres.Add(%v)\n", bp)
-		if result, err := bssdb.Add(bp); err != nil {
+		if _, err := bssdb.Add(bp); err != nil {
 			return err, ""
 		} else {
-			debugf("postgres.Add(%v) result: %v\n", bp, result)
 			return err, uuid.New().String()
 		}
 	}
@@ -546,10 +533,7 @@ func StoreNew(bp bssTypes.BootParams) (error, string) {
 }
 
 func Store(bp bssTypes.BootParams) (error, string) {
-	debugf("Store(%v)\n", bp)
-
 	if useSQL {
-		debugf("postgres.Set(%v)\n", bp)
 		if err := bssdb.Set(bp); err != nil {
 			return err, ""
 		} else {
@@ -620,7 +604,6 @@ func Store(bp bssTypes.BootParams) (error, string) {
 		}
 	case kernel_id != "":
 		idata := ImageData{bp.Kernel, bp.Params}
-		debugf("Ready to store data: %s, %v\n", kernel_id, idata)
 		err = storeData(kernel_id, idata)
 		referralToken = "" // referralToken was not needed
 	case initrd_id != "":
@@ -631,17 +614,13 @@ func Store(bp bssTypes.BootParams) (error, string) {
 		herr.AddProblem(base.NewProblemDetailsStatus("Nothing to Store", http.StatusBadRequest))
 		referralToken = "" // referralToken was not needed
 	}
-	debugf("Store referralToken: %s\n", referralToken)
 	return err, referralToken
 }
 
 // The update function will update entries but not NULL out existing entries.
 func Update(bp bssTypes.BootParams) error {
-	debugf("Update(%v)\n", bp)
-
 	// Perform postgres.Update() and return if postgres is enabled.
 	if useSQL {
-		debugf("postgres.Update(%v)", bp)
 		nodesUpdated, err := bssdb.Update(bp)
 		if err != nil {
 			return err
@@ -730,7 +709,6 @@ func Update(bp bssTypes.BootParams) error {
 		// If no hosts were specified, then we should update the
 		// parameters associated with the kernel image.
 		idata := ImageData{bp.Kernel, bp.Params}
-		debugf("Ready to store data: %s, %v\n", kernel_id, idata)
 		err = storeData(kernel_id, idata)
 	case initrd_id != "":
 		err = storeData(initrd_id, ImageData{bp.Initrd, bp.Params})
@@ -746,15 +724,7 @@ func updateCloudData(existing *bssTypes.CloudDataType, merge bssTypes.CloudDataT
 	changed := false
 	defer func() {
 		if err != nil {
-			log.Printf("PATCH request for %s failed: %s", dataType, err)
-			temp, err := json.Marshal(existing)
-			if err == nil {
-				log.Printf("    Existing: %s", temp)
-			}
-			temp, err = json.Marshal(merge)
-			if err == nil {
-				log.Printf("    Patch:    %s", temp)
-			}
+			log.Printf("PATCH request for %s failed: error_class=merge_error", dataType)
 		}
 	}()
 
@@ -1122,8 +1092,7 @@ func LookupByName(name string) (BootData, SMComponent) {
 			log.Printf("WARNING: Name %q did not return any results.", name)
 			return result, comp
 		} else if len(bps) > 1 {
-			debugf("BootParams returned: %v", bps)
-			log.Printf("WARNING: More than 1 node found for name %q, taking first one: %v", name, bps[0])
+			log.Printf("WARNING: More than 1 node found for name %q, taking first result", name)
 		}
 		result.Kernel = ImageData{bps[0].Kernel, ""}
 		result.Initrd = ImageData{bps[0].Initrd, ""}
@@ -1154,8 +1123,7 @@ func LookupByMAC(mac string) (BootData, SMComponent) {
 			log.Printf("WARNING: MAC %q did not return any results.", mac)
 			return result, comp
 		} else if len(bps) > 1 {
-			debugf("BootParams returned: %v", bps)
-			log.Printf("WARNING: More than 1 node found for MAC %q, taking first one: %v", mac, bps[0])
+			log.Printf("WARNING: More than 1 node found for MAC %q, taking first result", mac)
 		}
 		result.Kernel = ImageData{bps[0].Kernel, ""}
 		result.Initrd = ImageData{bps[0].Initrd, ""}
@@ -1187,8 +1155,7 @@ func LookupByNid(nid int) (BootData, SMComponent) {
 			log.Printf("WARNING: NID %d did not return any results.", nid)
 			return result, comp
 		} else if len(bps) > 1 {
-			debugf("BootParams returned: %v", bps)
-			log.Printf("WARNING: More than 1 node found for NID %d, taking first one: %v", nid, bps[0])
+			log.Printf("WARNING: More than 1 node found for NID %d, taking first result", nid)
 		}
 		result.Kernel = ImageData{bps[0].Kernel, ""}
 		result.Initrd = ImageData{bps[0].Initrd, ""}
