@@ -17,6 +17,7 @@ require (
 require (
 	github.com/Cray-HPE/hms-xname v1.4.0
 	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
+	github.com/aws/aws-sdk-go v1.55.5
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
@@ -32,13 +33,12 @@ require (
 	github.com/Cray-HPE/hms-base/v2 v2.3.0 // indirect
 	github.com/Cray-HPE/hms-certs v1.7.1 // indirect
 	github.com/Cray-HPE/hms-securestorage v1.18.0 // indirect
-	github.com/aws/aws-sdk-go v1.55.5 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
