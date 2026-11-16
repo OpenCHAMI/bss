@@ -17,7 +17,7 @@ require (
 require (
 	github.com/Cray-HPE/hms-xname v1.4.0
 	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
-	github.com/aws/aws-sdk-go v1.55.5
+	github.com/aws/aws-sdk-go v1.55.8
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.4.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
