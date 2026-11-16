@@ -3,7 +3,7 @@ module github.com/openchami/bss
 go 1.26.5
 
 require (
-	github.com/Cray-HPE/hms-base v1.15.1
+	github.com/Cray-HPE/hms-base/v2 v2.3.0
 	github.com/Cray-HPE/hms-hmetcd v1.11.0
 	github.com/Cray-HPE/hms-s3 v1.11.0
 	github.com/docker/distribution v2.8.3+incompatible
@@ -15,6 +15,7 @@ require (
 )
 
 require (
+	github.com/Cray-HPE/hms-base v1.15.1
 	github.com/Cray-HPE/hms-xname v1.4.0
 	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
 	github.com/aws/aws-sdk-go v1.55.5
@@ -30,7 +31,6 @@ require (
 )
 
 require (
-	github.com/Cray-HPE/hms-base/v2 v2.3.0 // indirect
 	github.com/Cray-HPE/hms-certs v1.7.1 // indirect
 	github.com/Cray-HPE/hms-securestorage v1.18.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
