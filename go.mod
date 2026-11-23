@@ -1,6 +1,6 @@
 module github.com/openchami/bss
 
-go 1.26.5
+go 1.26.10
 
 require (
 	github.com/Cray-HPE/hms-base v1.15.1
@@ -22,7 +22,8 @@ require (
 	github.com/go-chi/chi/v5 v5.4.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/hashicorp/go-retryablehttp v0.7.8
-	github.com/lestrrat-go/jwx v1.2.30
+	github.com/lestrrat-go/jwx v1.2.31
+	github.com/lestrrat-go/jwx/v4 v4.6.0
 	github.com/openchami/chi-middleware/auth v0.0.0-20240812224658-b16b83c70700
 	github.com/openchami/chi-middleware/log v0.0.0-20240812224658-b16b83c70700
 	github.com/openchami/smd/v2 v2.20.5
